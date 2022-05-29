@@ -79,6 +79,7 @@ MN_INTERNAL void mptest__leakcheck_init(struct mptest__state* state)
     state->first_block        = NULL;
     state->top_block          = NULL;
     state->total_allocations = 0;
+    state->total_calls = 0;
 }
 
 /* Destroy malloc-checking state. */
@@ -102,7 +103,7 @@ MN_INTERNAL void mptest__leakcheck_destroy(struct mptest__state* state)
 MN_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state)
 {
     /* Preserve `test_leak_checking` */
-    int test_leak_checking = state->test_leak_checking;
+    mptest__leakcheck_mode test_leak_checking = state->test_leak_checking;
     mptest__leakcheck_destroy(state);
     mptest__leakcheck_init(state);
     state->test_leak_checking = test_leak_checking;
@@ -177,6 +178,8 @@ MN_API void* mptest__leakcheck_hook_malloc(struct mptest__state* state,
     out_ptr = base_ptr + MPTEST__LEAKCHECK_HEADER_SIZEOF;
     /* Increment the total number of allocations */
     state->total_allocations++;
+    /* Increment the total number of calls */
+    state->total_calls++;
     return out_ptr;
 }
 
@@ -302,6 +305,8 @@ MN_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     old_block_info->realloc_next = new_block_info;
     new_block_info->realloc_prev = old_block_info;
     out_ptr                      = base_ptr + MPTEST__LEAKCHECK_HEADER_SIZEOF;
+    /* Increment the total number of calls */
+    state->total_calls++;
     return out_ptr;
 }
 

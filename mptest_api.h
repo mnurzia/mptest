@@ -17,6 +17,15 @@ typedef int mptest__result;
 /* or a miscellaneous error like a sym syntax error */
 #define MPTEST__RESULT_ERROR -2
 
+#if MPTEST_USE_LEAKCHECK
+typedef int mptest__leakcheck_mode;
+
+#define MPTEST__LEAKCHECK_MODE_OFF 0
+#define MPTEST__LEAKCHECK_MODE_ON 0
+#define MPTEST__LEAKCHECK_MODE_OOM_ONE 0
+#define MPTEST__LEAKCHECK_MODE_OOM_SET 0
+#endif
+
 /* Test function signature */
 typedef mptest__result (*mptest__test_func)(void);
 typedef void (*mptest__suite_func)(void);

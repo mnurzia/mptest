@@ -38,6 +38,19 @@ TEST(t_enable_disable_leakchecking) {
     PASS();
 }
 
+TEST(t_leak_malloc_SHOULD_FAIL) {
+    void* ptr = MPTEST_INJECT_MALLOC(5);
+    (void)(ptr);
+    PASS();
+}
+
+TEST(t_leak_realloc_SHOULD_FAIL) {
+    void* ptr = MPTEST_INJECT_MALLOC(5);
+    MPTEST_INJECT_REALLOC(ptr, 6);
+    (void)(ptr);
+    PASS();
+}
+
 int main(int argc, const char* const* argv) {
     MPTEST_MAIN_BEGIN_ARGS(argc, argv);
     RUN_TEST(t_pass);
@@ -46,6 +59,10 @@ int main(int argc, const char* const* argv) {
     RUN_TEST(t_assert_catch);
     RUN_TEST(t_assert_catch_SHOULD_FAIL);
     RUN_TEST(t_enable_disable_leakchecking);
+    MPTEST_ENABLE_LEAK_CHECKING();
+    RUN_TEST(t_leak_malloc_SHOULD_FAIL);
+    RUN_TEST(t_leak_realloc_SHOULD_FAIL);
+    MPTEST_DISABLE_LEAK_CHECKING();
     MPTEST_MAIN_END();
     return 0;
 }

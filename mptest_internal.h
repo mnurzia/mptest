@@ -4,6 +4,215 @@
 #include "mptest_api.h"
 #include "_cpack/internal.h"
 
+
+/* How assert checking works (and why we need longjmp for it):
+ * 1. You use the function ASSERT_ASSERT(statement) in your test code.
+ * 2. Under the hood, ASSERT_ASSERT setjmps the current test, and runs the
+ *    statement until an assert within the program fails.
+ * 3. The assert hook longjmps out of the code into the previous setjmp from
+ *    step (2).
+ * 4. mptest recognizes this jump back and passes the test.
+ * 5. If the jump back doesn't happen, mptest recognizes this too and fails the
+ *    test, expecting an assertion failure. */
+#if MPTEST_USE_LONGJMP
+    #include <setjmp.h>
+
+/* Enumeration of the reasons a `longjmp()` can happen from within a test.
+ * When running an assertion like `ASSERT_ASSERT()`, we check the returned
+ * jump reason to ensure that an assertion failure happened and not, e.g., a
+ * malloc failure. */
+typedef enum mptest__longjmp_reason
+{
+    MPTEST__LONGJMP_REASON_NONE,
+    /* An assertion failure. */
+    MPTEST__LONGJMP_REASON_ASSERT_FAIL = 1,
+    #if MPTEST_USE_LEAKCHECK
+    /* `malloc()` (the real one) *actually* returned NULL. As in, an actual
+     * error. */
+    MPTEST__LONGJMP_REASON_MALLOC_REALLY_RETURNED_NULL = 2,
+    /* You passed a NULL pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_NULL = 4,
+    /* You passed an invalid pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_INVALID = 8,
+    /* You passed an already-freed pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_FREED = 16,
+    /* You passed an already-reallocated pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_REALLOCED = 32,
+    /* You passed a NULL pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_NULL = 64,
+    /* You passed an invalid pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_INVALID = 128,
+    /* You passed an already-freed pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_FREED = 256,
+    /* You passed an already-reallocated pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_REALLOCED = 512,
+    #endif
+    MPTEST__LONGJMP_REASON_LAST
+} mptest__longjmp_reason;
+#endif
+
+#if MPTEST_USE_TIME
+    #include <time.h>
+#endif
+
+#if MPTEST_USE_APARSE
+    #define MPTEST__APARSE_ARG_COUNT 16
+#endif
+
+#define MPTEST__RESULT_SKIPPED -3
+
+/* The different ways a test can fail. */
+typedef enum mptest__fail_reason
+{
+    MPTEST__FAIL_REASON_ASSERT_FAILURE,
+#if MPTEST_USE_DYN_ALLOC
+    MPTEST__FAIL_REASON_NOMEM,
+#endif
+#if MPTEST_USE_LEAKCHECK
+    MPTEST__FAIL_REASON_LEAKED,
+#endif
+#if MPTEST_USE_SYM
+    MPTEST__FAIL_REASON_SYM_INEQUALITY,
+    MPTEST__FAIL_REASON_SYM_SYNTAX,
+    MPTEST__FAIL_REASON_SYM_DESERIALIZE,
+#endif
+    MPTEST__FAIL_REASON_LAST
+} mptest__fail_reason;
+
+/* Type representing a function to be called whenever a suite is set up or torn
+ * down. */
+typedef void (*mptest__suite_callback)(void* data);
+
+#if MPTEST_USE_SYM
+typedef struct mptest__sym_fail_data {
+    mptest_sym* sym_actual;
+    mptest_sym* sym_expected;
+} mptest__sym_fail_data;
+
+typedef struct mptest__sym_syntax_error_data {
+    const char* err_msg;
+    mn_size err_pos;
+} mptest__sym_syntax_error_data;
+#endif
+
+/* Data describing how the test failed. */
+typedef union mptest__fail_data {
+    const char* string_data;
+#if MPTEST_USE_LEAKCHECK
+    void* memory_block;
+#endif
+#if MPTEST_USE_SYM
+    mptest__sym_fail_data sym_fail_data;
+    mptest__sym_syntax_error_data sym_syntax_error_data;
+#endif
+} mptest__fail_data;
+
+#if MPTEST_USE_APARSE
+typedef struct mptest__aparse_name mptest__aparse_name;
+
+struct mptest__aparse_name {
+    const char* name;
+    mn_size name_len;
+    mptest__aparse_name* next;
+};
+
+typedef struct mptest__aparse_state {
+    aparse_state aparse;
+    /* -l, --leak-check : whether to enable leak checking or not */
+    int opt_leak_check;
+    /* -t, --test : the test name(s) to search for and run */
+    mptest__aparse_name* opt_test_name_head;
+    mptest__aparse_name* opt_test_name_tail;
+    /* -s, --suite : the suite name(s) to search for and run */
+    mptest__aparse_name* opt_suite_name_head;
+    mptest__aparse_name* opt_suite_name_tail;
+} mptest__aparse_state;
+#endif
+
+struct mptest__state {
+    /* Total number of assertions */
+    int assertions;
+    /* Total number of tests */
+    int total;
+    /* Total number of passes, fails, and errors */
+    int passes;
+    int fails;
+    int errors;
+    /* Total number of suite passes and fails */
+    int suite_passes;
+    int suite_fails;
+    /* 1 if the current suite failed, 0 if not */
+    int suite_failed;
+    /* Suite setup/teardown callbacks */
+    mptest__suite_callback suite_test_setup_cb;
+    mptest__suite_callback suite_test_teardown_cb;
+    /* Names of the current running test/suite */
+    const char* current_test;
+    const char* current_suite;
+    /* Reason for failing a test */
+    mptest__fail_reason fail_reason;
+    /* Fail diagnostics */
+    const char* fail_msg;
+    const char* fail_file;
+    int         fail_line;
+    /* Stores information about the failure. */
+    /* Assert expression that caused the fail, if `fail_reason` ==
+     * `MPTEST__FAIL_REASON_ASSERT_FAILURE` */
+    /* Pointer to offending allocation, if `longjmp_reason` is one of the
+     * malloc fail reasons */
+    mptest__fail_data fail_data;
+    /* Indentation level (used for output) */
+    int indent_lvl;
+
+#if MPTEST_USE_LONGJMP
+    /* Saved setjmp context (used for testing asserts, etc.) */
+    MN_JMP_BUF longjmp_assert_context;
+    /* Saved setjmp context (used to catch actual errors during testing) */
+    MN_JMP_BUF longjmp_test_context;
+    /* 1 if we are checking for a jump, 0 if not. Used so that if an assertion
+     * *accidentally* goes off, we can catch it. */
+    mptest__longjmp_reason longjmp_checking;
+    /* Reason for jumping (assertion failure, malloc/free failure, etc) */
+    mptest__longjmp_reason longjmp_reason;
+#endif
+
+#if MPTEST_USE_LEAKCHECK
+    /* 1 if current test should be audited for leaks, 0 otherwise. */
+    int test_leak_checking;
+    /* First and most recent blocks allocated. */
+    struct mptest__leakcheck_block* first_block;
+    struct mptest__leakcheck_block* top_block;
+    /* Total number of allocations. */
+    int total_allocations;
+#endif
+
+#if MPTEST_USE_TIME
+    /* Start times that will be compared against later */
+    clock_t program_start_time;
+    clock_t suite_start_time;
+    clock_t test_start_time;
+#endif
+
+#if MPTEST_USE_APARSE
+    mptest__aparse_state aparse_state;
+#endif
+
+#if MPTEST_USE_FUZZ
+    /* State of the random number generator */
+    mptest_rand rand_state;
+    /* Whether or not the current test should be fuzzed */
+    int fuzz_active;
+    /* Whether or not the current test failed on a fuzz */
+    int fuzz_failed;
+    /* Number of iterations to run the next test for */
+    int fuzz_iterations;
+    /* Fuzz failure context */
+    int fuzz_fail_iteration;
+    mptest_rand fuzz_fail_seed;
+#endif
+};
+
+
 #include <stdio.h>
 
 MN_INTERNAL mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func);

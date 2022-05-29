@@ -49,6 +49,9 @@
             "mptest_state.c",
             "mptest_sym.c",
             "mptest_time.c"
+        ],
+        "tests_impl": [
+            "tests/test_main.c"
         ]
     },
     "config": {

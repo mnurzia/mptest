@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 
-MN_INTERNAL enum mptest__result mptest__state_run_test(struct mptest__state* state, mptest__test_func test_func);
+MN_INTERNAL enum mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func);
 MN_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
 
 #if MPTEST_USE_LONGJMP

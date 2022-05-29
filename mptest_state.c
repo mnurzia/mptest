@@ -163,11 +163,11 @@ MN_API enum mptest__result mptest__state_before_test(
 #if MPTEST_USE_FUZZ
     return mptest__fuzz_run_test(state, test_func);
 #else
-    return mptest__state_run_test(state, test_func);
+    return mptest__state_do_run_test(state, test_func);
 #endif
 }
 
-MN_INTERNAL enum mptest__result mptest__state_run_test(struct mptest__state* state, mptest__test_func test_func) {
+MN_INTERNAL enum mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func) {
     enum mptest__result res;
 #if MPTEST_USE_LONGJMP
     if (MN_SETJMP(state->longjmp_test_context) == 0) {
@@ -408,6 +408,11 @@ MN_API void mptest__state_after_test(struct mptest__state* state,
         res == MPTEST__RESULT_PASS || res == MPTEST__RESULT_SKIPPED) {
         printf("\n");
     }
+}
+
+MN_API void mptest__run_test(struct mptest__state* state, mptest__test_func test_func, const char* test_name) {
+    enum mptest__result res = mptest__state_before_test(state, test_func, test_name);
+    mptest__state_after_test(state, res);
 }
 
 /* Ran before a suite is executed. */

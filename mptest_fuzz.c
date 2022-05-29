@@ -32,7 +32,7 @@ MN_INTERNAL enum mptest__result mptest__fuzz_run_test(struct mptest__state* stat
         /* Save the start state */
         mptest_rand start_state = state->rand_state;
         int should_finish = 0;
-        res = mptest__state_run_test(state, test_func);
+        res = mptest__state_do_run_test(state, test_func);
         /* Note: we don't handle MPTEST__RESULT_SKIPPED because it is handled in
          * the calling function. */
         if (res != MPTEST__RESULT_PASS) {

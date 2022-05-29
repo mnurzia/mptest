@@ -475,6 +475,11 @@ MN_API aparse_error aparse_parse(aparse_state* state, int argc, const char* cons
                 return err;
             }
             return APARSE_ERROR_PARSE;
+        } else if (err == APARSE_ERROR_SHOULD_EXIT) {
+            if ((err = aparse__state_flush(state->state))) {
+                return err;
+            }
+            return APARSE_ERROR_SHOULD_EXIT;
         } else {
             return err;
         }
@@ -596,17 +601,118 @@ MN_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state* st
     MN__UNUSED(sub_arg_idx);
     MN__UNUSED(text);
     MN__UNUSED(text_size);
-    /* TODO: print usage */
-    if ((err = aparse__state_out_s(state, "usage\n"))) {
+    if ((err = aparse__error_usage(state))) {
         return err;
     }
-    /* TODO: print help */
-    if ((err = aparse__state_out_s(state, "options\n"))) {
-        return err;
+    {
+        int has_printed_header = 0;
+        aparse__arg* cur = state->head;
+        while (cur) {
+            if (cur->type != APARSE__ARG_TYPE_POSITIONAL) {
+                cur = cur->next;
+                continue;
+            }
+            if (!has_printed_header) {
+                if ((err = aparse__state_out_s(state, "\npositional arguments:\n"))) {
+                    return err;
+                }
+                has_printed_header = 1;
+            }
+            if ((err = aparse__state_out_s(state, "  "))) {
+                return err;
+            }
+            if (cur->metavar == MN_NULL) {
+                if ((err = aparse__state_out_n(state, cur->contents.pos.name, cur->contents.pos.name_size))) {
+                    return err;
+                }
+            } else {
+                if ((err = aparse__state_out_n(state, cur->metavar, cur->metavar_size))) {
+                    return err;
+                }
+            }
+            if ((err = aparse__state_out(state, '\n'))) {
+                return err;
+            }
+            if (cur->help != MN_NULL) {
+                if ((err = aparse__state_out_s(state, "    "))) {
+                    return err;
+                }
+                if ((err = aparse__state_out_n(state, cur->help, cur->help_size))) {
+                    return err;
+                }
+                if ((err = aparse__state_out(state, '\n'))) {
+                    return err;
+                }
+            }
+            cur = cur->next;
+        }
     }
-    /* TODO: print aux */
-    if ((err = aparse__state_out_s(state, "aux\n"))) {
-        return err;
+    {
+        int has_printed_header = 0;
+        aparse__arg* cur = state->head;
+        while (cur) {
+            if (cur->type != APARSE__ARG_TYPE_OPTIONAL) {
+                cur = cur->next;
+                continue;
+            }
+            if (!has_printed_header) {
+                if ((err = aparse__state_out_s(state, "\noptional arguments:\n"))) {
+                    return err;
+                }
+                has_printed_header = 1;
+            }
+            if ((err = aparse__state_out_s(state, "  "))) {
+                return err;
+            }
+            if (cur->contents.opt.short_opt != '\0') {
+                if ((err = aparse__error_print_short_opt(state, cur))) {
+                    return err;
+                }
+                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ &&
+                    cur->nargs != 0) {
+                    if ((err = aparse__state_out(state, ' '))) {
+                        return err;
+                    }
+                }
+                if ((err = aparse__error_print_sub_args(state, cur))) {
+                    return err;
+                }
+            }
+            if (cur->contents.opt.long_opt != MN_NULL) {
+                if (cur->contents.opt.short_opt != '\0') {
+                    if ((err = aparse__state_out_s(state, ", "))) {
+                        return err;
+                    }
+                }
+                if ((err = aparse__error_print_long_opt(state, cur))) {
+                    return err;
+                }
+                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ &&
+                    cur->nargs != 0) {
+                    if ((err = aparse__state_out(state, ' '))) {
+                        return err;
+                    }
+                }
+                if ((err = aparse__error_print_sub_args(state, cur))) {
+                    return err;
+                }
+            }
+            if ((err = aparse__state_out(state, '\n'))) {
+                return err;
+            }
+            if (cur->help != MN_NULL) {
+                if ((err = aparse__state_out_s(state, "    "))) {
+                    return err;
+                }
+                if ((err = aparse__state_out_n(state, cur->help, cur->help_size))) {
+                    return err;
+                }
+                if ((err = aparse__state_out(state, '\n'))) {
+                    return err;
+                }
+            }
+            cur = cur->next;
+        }
     }
     return APARSE_SHOULD_EXIT;
 }
@@ -682,12 +788,47 @@ MN_INTERNAL void aparse__arg_sub_destroy(aparse__arg* arg) {
 
 #if MPTEST_USE_APARSE
 /* aparse */
-MN_INTERNAL aparse_error aparse__error_begin(aparse__state* state) {
+MN_INTERNAL aparse_error aparse__error_begin_progname(aparse__state* state) {
     aparse_error err = APARSE_ERROR_NONE;
     if ((err = aparse__state_out_n(state, state->root->prog_name, state->root->prog_name_size))) {
         return err;
     }
-    if ((err = aparse__state_out_s(state, ": error: "))) {
+    if ((err = aparse__state_out_s(state, ": "))) {
+        return err;
+    }
+    return err;
+}
+
+MN_INTERNAL aparse_error aparse__error_begin(aparse__state* state) {
+    aparse_error err = APARSE_ERROR_NONE;
+    if ((err = aparse__error_begin_progname(state))) {
+        return err;
+    }
+    if ((err = aparse__state_out_s(state, "error: "))) {
+        return err;
+    }
+    return err;
+}
+
+MN_INTERNAL aparse_error aparse__error_print_short_opt(aparse__state* state, const aparse__arg* arg) {
+    aparse_error err = APARSE_ERROR_NONE;
+    MN_ASSERT(arg->contents.opt.short_opt);
+    if ((err = aparse__state_out(state, '-'))) {
+        return err;
+    }
+    if ((err = aparse__state_out(state, arg->contents.opt.short_opt))) {
+        return err;
+    }
+    return err;
+}
+
+MN_INTERNAL aparse_error aparse__error_print_long_opt(aparse__state* state, const aparse__arg* arg) {
+    aparse_error err = APARSE_ERROR_NONE;
+    MN_ASSERT(arg->contents.opt.long_opt);
+    if ((err = aparse__state_out_s(state, "--"))) {
+        return err;
+    }
+    if ((err = aparse__state_out_n(state, arg->contents.opt.long_opt, arg->contents.opt.long_opt_size))) {
         return err;
     }
     return err;
@@ -703,23 +844,17 @@ MN_INTERNAL aparse_error aparse__error_begin_opt(aparse__state* state, const apa
         return err;
     }
     if (arg->contents.opt.short_opt != '\0') {
-        if ((err = aparse__state_out(state, '-'))) {
-            return err;
-        }
-        if ((err = aparse__state_out(state, arg->contents.opt.short_opt))) {
+        if ((err = aparse__error_print_short_opt(state, arg))) {
             return err;
         }
     }
-    if (arg->contents.opt.long_opt == MN_NULL) {
+    if (arg->contents.opt.long_opt != MN_NULL) {
         if (arg->contents.opt.short_opt != '\0') {
             if ((err = aparse__state_out_s(state, ", "))) {
                 return err;
             }
         }
-        if ((err = aparse__state_out_s(state, "--"))) {
-            return err;
-        }
-        if ((err = aparse__state_out_n(state, arg->contents.opt.long_opt, arg->contents.opt.long_opt_size))) {
+        if ((err = aparse__error_print_long_opt(state, arg))) {
             return err;
         }
     }
@@ -808,6 +943,169 @@ MN_INTERNAL aparse_error aparse__error_quote(aparse__state* state, const char* t
         }
     }
     if ((err = aparse__state_out(state, '"'))) {
+        return err;
+    }
+    return err;
+}
+
+int aparse__error_can_coalesce_in_usage(const aparse__arg* arg) {
+    if (arg->type != APARSE__ARG_TYPE_OPTIONAL) {
+        return 0;
+    }
+    if (arg->required) {
+        return 0;
+    }
+    if (arg->contents.opt.short_opt == '\0') {
+        return 0;
+    }
+    if ((arg->nargs != APARSE_NARGS_0_OR_1_EQ) && (arg->nargs != 0)) {
+        return 0;
+    }
+    return 1;
+}
+
+MN_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg) {
+    aparse_error err = APARSE_ERROR_NONE;
+    const char* var;
+    mn_size var_size;
+    if (arg->metavar != MN_NULL) {
+        var = arg->metavar;
+        var_size = arg->metavar_size;
+    } else if (arg->type == APARSE__ARG_TYPE_POSITIONAL) {
+        var = arg->contents.pos.name;
+        var_size = arg->contents.pos.name_size;
+    } else {
+        var = "ARG";
+        var_size = 3;
+    }
+    if (arg->nargs == APARSE_NARGS_1_OR_MORE) {
+        if ((err = aparse__state_out_n(state, var, var_size))) {
+            return err;
+        }
+        if ((err = aparse__state_out_s(state, " ["))) {
+            return err;
+        }
+        if ((err = aparse__state_out_n(state, var, var_size))) {
+            return err;
+        }
+        if ((err = aparse__state_out_s(state, " ...]]"))) {
+            return err;
+        }
+    } else if (arg->nargs == APARSE_NARGS_0_OR_MORE) {
+        if ((err = aparse__state_out(state, '['))) {
+            return err;
+        }
+        if ((err = aparse__state_out_n(state, var, var_size))) {
+            return err;
+        }
+        if ((err = aparse__state_out_s(state, " ["))) {
+            return err;
+        }
+        if ((err = aparse__state_out_n(state, var, var_size))) {
+            return err;
+        }
+        if ((err = aparse__state_out_s(state, " ...]]"))) {
+            return err;
+        }
+    } else if (arg->nargs == APARSE_NARGS_0_OR_1_EQ) {
+        /* pass */
+    } else if (arg->nargs == APARSE_NARGS_0_OR_1) {
+        if ((err = aparse__state_out(state, '['))) {
+            return err;
+        }
+        if ((err = aparse__state_out_n(state, var, var_size))) {
+            return err;
+        }
+        if ((err = aparse__state_out(state, ']'))) {
+            return err;
+        }
+    } else if (arg->nargs > 0) {
+        int i;
+        for (i = 0; i < arg->nargs; i++) {
+            if (i) {
+                if ((err = aparse__state_out(state, ' '))) {
+                    return err;
+                }
+            }
+            if ((err = aparse__state_out_n(state, var, var_size))) {
+                return err;
+            }
+        }
+    }
+    return err;
+}
+
+MN_INTERNAL aparse_error aparse__error_usage(aparse__state* state) {
+    aparse_error err = APARSE_ERROR_NONE;
+    const aparse__arg* cur = state->head;
+    int has_printed = 0;
+    if ((err = aparse__state_out_s(state, "usage: "))) {
+        return err;
+    }
+    if ((err = aparse__state_out_n(state, state->root->prog_name, state->root->prog_name_size))) {
+        return err;
+    }
+    /* print coalesced args */
+    while (cur) {
+        if (aparse__error_can_coalesce_in_usage(cur)) {
+            if (!has_printed) {
+                if ((err = aparse__state_out_s(state, " [-"))) {
+                    return err;
+                }
+                has_printed = 1;
+            }
+            if ((err = aparse__state_out(state, cur->contents.opt.short_opt))) {
+                return err;
+            }
+        }
+        cur = cur->next;
+    }
+    if (has_printed) {
+        if ((err = aparse__state_out(state, ']'))) {
+            return err;
+        }
+    }
+    /* print other args */
+    cur = state->head;
+    while (cur) {
+        if (!aparse__error_can_coalesce_in_usage(cur)) {
+            if ((err = aparse__state_out(state, ' '))) {
+                return err;
+            }
+            if (!cur->required) {
+                if ((err = aparse__state_out(state, '['))) {
+                    return err;
+                }
+            }
+            if (cur->type == APARSE__ARG_TYPE_OPTIONAL) {
+                if (cur->contents.opt.short_opt) {
+                    if ((err = aparse__error_print_short_opt(state, cur))) {
+                        return err;
+                    }
+                } else if (cur->contents.opt.long_opt) {
+                    if ((err = aparse__error_print_long_opt(state, cur))) {
+                        return err;
+                    }
+                }
+                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ &&
+                    cur->nargs != 0) {
+                    if ((err = aparse__state_out(state, ' '))) {
+                        return err;
+                    }
+                }
+            }
+            if ((err = aparse__error_print_sub_args(state, cur))) {
+                return err;
+            }
+            if (!cur->required) {
+                if ((err = aparse__state_out(state, ']'))) {
+                    return err;
+                }
+            }
+        }
+        cur = cur->next;
+    }
+    if ((err = aparse__state_out(state, '\n'))) {
         return err;
     }
     return err;
@@ -1035,12 +1333,16 @@ MN_INTERNAL void aparse__state_init(aparse__state* state) {
     state->is_root = 0;
 }
 
+#if 0
+
 MN_INTERNAL void aparse__state_init_from(aparse__state* state, aparse__state* other) {
     aparse__state_init(state);
     state->out_cb = other->out_cb;
     state->user = other->user;
     state->root = other->root;
 }
+
+#endif
 
 MN_INTERNAL void aparse__state_destroy(aparse__state* state) {
     aparse__arg* arg = state->head;
@@ -1094,17 +1396,25 @@ MN_INTERNAL aparse_error aparse__state_arg(aparse__state* state) {
 }
 
 MN_INTERNAL void aparse__state_check_before_add(aparse__state* state) {
+    /* for release builds */
+    MN__UNUSED(state);
+
     /* If this fails, you forgot to specifiy a type for the previous argument. */
     MN_ASSERT(MN__IMPLIES(state->tail != MN_NULL, state->tail->callback != MN_NULL));
 }
 
 MN_INTERNAL void aparse__state_check_before_modify(aparse__state* state) {
+    /* for release builds */
+    MN__UNUSED(state);
+
     /* If this fails, you forgot to call add_opt() or add_pos(). */
     MN_ASSERT(state->tail != MN_NULL);
 }
 
 MN_INTERNAL void aparse__state_check_before_set_type(aparse__state* state) {
-    MN__UNUSED(state); /* for release builds */
+    /* for release builds */
+    MN__UNUSED(state);
+
     /* If this fails, you forgot to call add_opt() or add_pos(). */
     MN_ASSERT(state->tail != MN_NULL);
 
@@ -1155,6 +1465,7 @@ MN_INTERNAL aparse_error aparse__state_add_sub(aparse__state* state) {
     return err;
 }
 
+#if 0
 MN_INTERNAL aparse_error aparse__state_sub_add_cmd(aparse__state* state, const char* name, aparse__state** subcmd) {
     aparse__sub* sub = (aparse__sub*)MN_MALLOC(sizeof(aparse__sub));
     MN_ASSERT(state->tail->type == APARSE__ARG_TYPE_SUBCOMMAND);
@@ -1176,6 +1487,9 @@ MN_INTERNAL aparse_error aparse__state_sub_add_cmd(aparse__state* state, const c
     *subcmd = &sub->subparser;
     return 0;
 }
+
+#endif
+
 
 MN_INTERNAL aparse_error aparse__state_flush(aparse__state* state) {
     aparse_error err = APARSE_ERROR_NONE;

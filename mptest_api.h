@@ -239,11 +239,7 @@ typedef void (*mptest__suite_func)(void);
 MN_API void mptest__state_init(struct mptest__state* state);
 MN_API void mptest__state_destroy(struct mptest__state* state);
 MN_API void mptest__state_report(struct mptest__state* state);
-MN_API enum mptest__result mptest__state_before_test(
-    struct mptest__state* state, mptest__test_func test_func,
-    const char* test_name);
-MN_API void mptest__state_after_test(struct mptest__state* state,
-    enum mptest__result                                         res);
+MN_API void mptest__run_test(struct mptest__state* state, mptest__test_func test_func, const char* test_name);
 MN_API void mptest__state_before_suite(struct mptest__state* state,
     mptest__suite_func suite_func,
     const char*                                                   suite_name);
@@ -333,10 +329,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 /* Run a test. Should only be used from within a suite. */
 #define RUN_TEST(test)                                                        \
     do {                                                                      \
-        enum mptest__result res;                                              \
-        res = mptest__state_before_test(&mptest__state_g,                     \
-            mptest__test_##test, #test);                                      \
-        mptest__state_after_test(&mptest__state_g, res);                      \
+        mptest__run_test(&mptest__state_g, mptest__test_##test, #test); \
     } while (0)
 
 /* Run a suite. */

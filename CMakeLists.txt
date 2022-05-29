@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(mptest VERSION 0.1.0)
 set(SOURCES mptest_aparse.c mptest_fuzz.c mptest_leakcheck.c mptest_longjmp.c mptest_state.c mptest_sym.c mptest_time.c _cpack/impl.c)
-set(TEST_SOURCES )
+set(TEST_SOURCES tests/test_main.c)
 set(ANY_OPTS "-Wall" "-Werror" "-Wextra" "-Wshadow" "-Wconversion" "-Wstrict-prototypes" "-Wuninitialized" "-Wpedantic" "--std=c89")
 set(DEBUG_OPTS "-g" "-O0")
 set(RELEASE_OPTS "-O3")

@@ -65,7 +65,7 @@ int mn__str_view_cmp(const mn__str_view* a, const mn__str_view* b);
 
 #if MPTEST_USE_APARSE
 /* bits/util/ntstr/cmp_n */
-MN_INTERNAL mn__scmp_n(const char* a, mn_size a_size, const char* b);
+MN_INTERNAL int mn__scmp_n(const char* a, mn_size a_size, const char* b);
 #endif /* MPTEST_USE_APARSE */
 
 /* bits/util/ntstr/len */
@@ -167,7 +167,9 @@ struct aparse__sub {
 
 MN_INTERNAL void aparse__arg_init(aparse__arg* arg);
 MN_INTERNAL void aparse__arg_destroy(aparse__arg* arg);
+#if 0
 MN_INTERNAL void aparse__state_init_from(aparse__state* state, aparse__state* other);
+#endif
 MN_INTERNAL void aparse__state_init(aparse__state* state);
 MN_INTERNAL void aparse__state_destroy(aparse__state* state);
 MN_INTERNAL void aparse__state_set_out_cb(aparse__state* state, aparse_out_cb out_cb, void* user);
@@ -197,6 +199,10 @@ MN_INTERNAL aparse_error aparse__error_begin(aparse__state* state);
 MN_INTERNAL aparse_error aparse__error_begin_arg(aparse__state* state, const aparse__arg* arg);
 MN_INTERNAL aparse_error aparse__error_unrecognized_arg(aparse__state* state, const char* arg);
 MN_INTERNAL aparse_error aparse__error_quote(aparse__state* state, const char* text, mn_size text_size);
+MN_INTERNAL aparse_error aparse__error_usage(aparse__state* state);
+MN_INTERNAL aparse_error aparse__error_print_short_opt(aparse__state* state, const aparse__arg* arg);
+MN_INTERNAL aparse_error aparse__error_print_long_opt(aparse__state* state, const aparse__arg* arg);
+MN_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg);
 #endif /* MPTEST_USE_APARSE */
 
 #if MPTEST_USE_DYN_ALLOC

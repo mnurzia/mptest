@@ -80,6 +80,8 @@ MN_INTERNAL void mptest__leakcheck_init(struct mptest__state* state)
     state->top_block          = NULL;
     state->total_allocations = 0;
     state->total_calls = 0;
+    state->oom_failed = 0;
+    state->oom_fail_call = -1;
 }
 
 /* Destroy malloc-checking state. */
@@ -135,6 +137,17 @@ MN_API void* mptest__leakcheck_hook_malloc(struct mptest__state* state,
     char* out_ptr;
     if (!state->test_leak_checking) {
         return (char*)MN_MALLOC(size);
+    }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
+        if (state->total_calls == state->oom_fail_call) {
+            state->total_calls++;
+            return NULL;
+        }
+    }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
+        if (state->total_calls == state->oom_fail_call) {
+            return NULL;
+        }
     }
     /* Allocate the memory the user requested + space for the header */
     base_ptr = (char*)MN_MALLOC(size + MPTEST__LEAKCHECK_HEADER_SIZEOF);
@@ -240,6 +253,17 @@ MN_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     if (!state->test_leak_checking) {
         return (void*)MN_REALLOC(old_ptr, new_size);
     }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
+        if (state->total_calls == state->oom_fail_call) {
+            state->total_calls++;
+            return NULL;
+        }
+    }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
+        if (state->total_calls == state->oom_fail_call) {
+            return NULL;
+        }
+    }
     old_header = (struct mptest__leakcheck_header*)((char*)old_ptr
                                             - MPTEST__LEAKCHECK_HEADER_SIZEOF);
     old_block_info = old_header->block;
@@ -312,6 +336,39 @@ MN_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
 
 MN_API void mptest__leakcheck_set(struct mptest__state* state, int on) {
     state->test_leak_checking = on;
+}
+
+MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* state, mptest__test_func test_func) {
+    int max_iter = 0;
+    int i;
+    mptest__result res = MPTEST__RESULT_PASS;
+    state->oom_fail_call = -1;
+    state->oom_failed = 0;
+    res = mptest__state_do_run_test(state, test_func);
+    max_iter = state->total_calls;
+    if (res) {
+        /* Initial test failed. */
+        return res;
+    }
+    for (i = 0; i < max_iter; i++) {
+        int should_finish = 0;
+        res = mptest__state_do_run_test(state, test_func);
+        if (res != MPTEST__RESULT_PASS) {
+            should_finish = 1;
+        }
+#if MPTEST_USE_LEAKCHECK
+        if (mptest__leakcheck_has_leaks(state)) {
+            should_finish = 1;
+        }
+#endif
+        if (should_finish) {
+            /* Save fail context */
+            state->oom_fail_call = i;
+            state->oom_failed = 1;
+            break;
+        }
+    }
+    return res;
 }
 
 #endif

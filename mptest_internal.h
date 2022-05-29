@@ -188,6 +188,10 @@ struct mptest__state {
     int total_allocations;
     /* Total number of calls to malloc() or realloc(). */
     int total_calls;
+    /* Whether or not the current test failed on an OOM condition */
+    int oom_failed;
+    /* The index of the call that the test failed on */
+    int oom_fail_call;
 #endif
 
 #if MPTEST_USE_TIME
@@ -215,7 +219,6 @@ struct mptest__state {
     mptest_rand fuzz_fail_seed;
 #endif
 };
-
 
 #include <stdio.h>
 
@@ -284,6 +287,7 @@ MN_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state);
 MN_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state);
 MN_INTERNAL int mptest__leakcheck_block_has_freeable(
     struct mptest__leakcheck_block* block);
+MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* state, mptest__test_func test_func);
 #endif
 
 #if MPTEST_USE_COLOR

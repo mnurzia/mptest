@@ -14,8 +14,21 @@ TEST(t_fuzz) {
     PASS();
 }
 
+static void bad_assert() {
+    MPTEST_INJECT_ASSERT(0);
+}
+
+static void good_assert() {
+    MPTEST_INJECT_ASSERT(1);
+}
+
 TEST(t_assert_catch) {
-    ASSERT_ASSERT(MPTEST_INJECT_ASSERT(0));
+    ASSERT_ASSERT(bad_assert());
+    PASS();
+}
+
+TEST(t_assert_catch_SHOULD_FAIL) {
+    ASSERT_ASSERT(good_assert());
     PASS();
 }
 
@@ -25,6 +38,7 @@ int main(int argc, const char* const* argv) {
     RUN_SUITE(s_pass);
     FUZZ_TEST(t_fuzz);
     RUN_TEST(t_assert_catch);
+    RUN_TEST(t_assert_catch_SHOULD_FAIL);
     MPTEST_MAIN_END();
     return 0;
 }

@@ -247,6 +247,8 @@ MN_API void mptest__assert_pass(struct mptest__state* state, const char* msg, co
 
 MN_API void mptest_assert_fail_breakpoint(void);
 
+MN_API MN_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state);
+MN_API void mptest__catch_assert_end(struct mptest__state* state);
 MN_API void mptest__catch_assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 
 #if MPTEST_USE_LEAKCHECK
@@ -382,15 +384,13 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
     /* Assert that an assertion failure will occur within statement `stmt`. */
     #define ASSERT_ASSERTm(stmt, msg)                                         \
         do {                                                                  \
-            mptest__state_g.longjmp_checking                                  \
-                = MPTEST__LONGJMP_REASON_ASSERT_FAIL;                         \
-            if (MN_SETJMP(mptest__state_g.longjmp_assert_context) == 0) { \
+            if (MN_SETJMP(*mptest__catch_assert_begin(&mptest__state_g)) == 0) { \
                 stmt;                                                         \
-                mptest__state_g.longjmp_checking = 0;                         \
+                mptest__catch_assert_end(&mptest__state_g); \
                 _ASSERT_FAIL_BEHAVIOR(                                        \
                     "<runtime-assert-checked-function> " #stmt, msg);         \
             } else {                                                          \
-                mptest__state_g.longjmp_checking = 0;                         \
+                mptest__catch_assert_end(&mptest__state_g); \
                 _ASSERT_PASS_BEHAVIOR(                                        \
                     "<runtime-assert-checked-function> " #stmt, msg);         \
             }                                                                 \

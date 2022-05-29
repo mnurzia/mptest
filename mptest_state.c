@@ -140,7 +140,7 @@ MN_INTERNAL int mptest__streq(const char* a, const char* b)
 }
 
 /* Ran when setting up for a test before it is run. */
-MN_API enum mptest__result mptest__state_before_test(
+MN_INTERNAL enum mptest__result mptest__state_before_test(
     struct mptest__state* state, mptest__test_func test_func,
     const char* test_name)
 {
@@ -182,7 +182,7 @@ MN_INTERNAL enum mptest__result mptest__state_do_run_test(struct mptest__state* 
 }
 
 /* Ran when a test is over. */
-MN_API void mptest__state_after_test(struct mptest__state* state,
+MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
     enum mptest__result                                         res)
 {
 #if MPTEST_USE_LEAKCHECK
@@ -416,7 +416,7 @@ MN_API void mptest__run_test(struct mptest__state* state, mptest__test_func test
 }
 
 /* Ran before a suite is executed. */
-MN_API void mptest__state_before_suite(struct mptest__state* state,
+MN_INTERNAL void mptest__state_before_suite(struct mptest__state* state,
     mptest__suite_func suite_func,
     const char*                                                   suite_name)
 {
@@ -436,7 +436,7 @@ MN_API void mptest__state_before_suite(struct mptest__state* state,
 }
 
 /* Ran after a suite is executed. */
-MN_API void mptest__state_after_suite(struct mptest__state* state)
+MN_INTERNAL void mptest__state_after_suite(struct mptest__state* state)
 {
     if (!state->suite_failed) {
         state->suite_passes++;
@@ -446,6 +446,11 @@ MN_API void mptest__state_after_suite(struct mptest__state* state)
     state->current_suite = NULL;
     state->suite_failed  = 0;
     state->indent_lvl--;
+}
+
+MN_API void mptest__run_suite(struct mptest__state* state, mptest__suite_func suite_func, const char* suite_name) {
+    mptest__state_before_suite(state, suite_func, suite_name);
+    mptest__state_after_suite(state);
 }
 
 /* Fills state with information on pass. */

@@ -240,10 +240,7 @@ MN_API void mptest__state_init(struct mptest__state* state);
 MN_API void mptest__state_destroy(struct mptest__state* state);
 MN_API void mptest__state_report(struct mptest__state* state);
 MN_API void mptest__run_test(struct mptest__state* state, mptest__test_func test_func, const char* test_name);
-MN_API void mptest__state_before_suite(struct mptest__state* state,
-    mptest__suite_func suite_func,
-    const char*                                                   suite_name);
-MN_API void mptest__state_after_suite(struct mptest__state* state);
+MN_API void mptest__run_suite(struct mptest__state* state, mptest__suite_func suite_func, const char* suite_name);
 
 MN_API void mptest__assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 MN_API void mptest__assert_pass(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
@@ -335,8 +332,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 /* Run a suite. */
 #define RUN_SUITE(suite)                                                      \
     do {                                                                      \
-        mptest__state_before_suite(&mptest__state_g, mptest__suite_##suite, #suite);   \
-        mptest__state_after_suite(&mptest__state_g);                          \
+        mptest__run_suite(&mptest__state_g, mptest__suite_##suite, #suite); \
     } while (0)
 
 #if MPTEST_USE_FUZZ

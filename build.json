@@ -1,0 +1,123 @@
+{
+    "desc": "Testing library",
+    "requires": [
+        "bits/util/exports",
+        "bits/util/cstd",
+        {
+            "name": "bits/hooks/malloc", 
+            "flags": ["MPTEST_USE_DYN_ALLOC"]
+        },
+        "bits/hooks/longjmp", 
+        "bits/hooks/assert", 
+        {
+            "name": "bits/container/str",
+            "flags": ["MPTEST_USE_DYN_ALLOC", "MPTEST_USE_SYM"]
+        },
+        {
+            "name": "bits/container/str_view",
+            "flags": ["MPTEST_USE_DYN_ALLOC", "MPTEST_USE_SYM"]
+        },
+        {
+            "name": "bits/container/vec",
+            "flags": ["MPTEST_USE_DYN_ALLOC", "MPTEST_USE_SYM"]
+        },
+        {
+            "name": "bits/types/fixed/int32",
+            "flags": ["MPTEST_USE_SYM"]
+        },
+        {
+            "name": "aparse",
+            "flags": ["MPTEST_USE_APARSE"]
+        },
+        {
+            "name": "bits/util/ntstr/cmp_n",
+            "flags": ["MPTEST_USE_APARSE"]
+        }
+    ],
+    "files": {
+        "api": [
+            "mptest_api.h"
+        ],
+        "internal": [
+            "mptest_internal.h"
+        ],
+        "impl": [
+            "mptest_aparse.c",
+            "mptest_fuzz.c",
+            "mptest_leakcheck.c",
+            "mptest_longjmp.c",
+            "mptest_state.c",
+            "mptest_sym.c",
+            "mptest_time.c"
+        ]
+    },
+    "config": {
+        "MPTEST_USE_DYN_ALLOC": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_DYN_ALLOC to 1 in order to allow the usage ",
+                "of malloc() and free() inside mptest. Mptest can run ",
+                "without these functions, but certain features are ",
+                "disabled."
+            ],
+            "default": "1"
+        },
+        "MPTEST_USE_LONGJMP": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_LONGJMP to 1 in order to use runtime assert checking ",
+                "facilities. Must be enabled to use heap profiling."
+            ],
+            "default": "1"
+        },
+        "MPTEST_USE_SYM": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_SYM to 1 in order to use s-expression ",
+                "data structures for testing. MPTEST_USE_DYN_ALLOC must be ",
+                "set. "
+            ],
+            "default": "1"
+        },
+        "MPTEST_USE_LEAKCHECK": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_LEAKCHECK to 1 in order to use runtime leak ",
+                "checking facilities. MPTEST_USE_LONGJMP must be set."
+            ],
+            "default": "1",
+            "requires": ["MPTEST_USE_LONGJMP", "MPTEST_USE_DYN_ALLOC"]
+        },
+        "MPTEST_USE_COLOR": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_COLOR to 1 if you want ANSI-colored output."
+            ],
+            "default": "1"
+        },
+        "MPTEST_USE_TIME": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_TIME to 1 if you want to time tests or suites."
+            ],
+            "default": "1"
+        },
+        "MPTEST_USE_APARSE": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_APARSE to 1 if you want to build a command line ",
+                "version of the test program."
+            ],
+            "default": "1"
+        },
+        "MPTEST_USE_FUZZ": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_USE_FUZZ to 1 if you want to include fuzzing and ",
+                "test shuffling support."
+            ],
+            "default": "1"
+        }
+    },
+    "version": "0.1.0"
+}

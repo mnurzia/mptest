@@ -18,7 +18,7 @@ MN_INTERNAL void mptest__longjmp_destroy(struct mptest__state* state)
  * depending on if we wanted `reason` to happen or not. In other words, this
  * will fail the test if we weren't explicitly checking for `reason` to happen,
  * meaning `reason` was unexpected and thus an error. */
-MN_API void mptest__longjmp_exec(struct mptest__state* state,
+MN_INTERNAL void mptest__longjmp_exec(struct mptest__state* state,
     enum mptest__longjmp_reason reason, const char* file, int line, const char* msg)
 {
     state->longjmp_reason = reason;

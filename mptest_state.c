@@ -476,3 +476,8 @@ MN_API void mptest__assert_fail(struct mptest__state* state, const char* msg, co
 MN_API void mptest_assert_fail_breakpoint() {
     return;
 }
+
+MN_API void mptest__catch_assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line) {
+    state->fail_data.string_data = assert_expr;
+    mptest__longjmp_exec(state, MPTEST__LONGJMP_REASON_ASSERT_FAIL, file, line, msg);
+}

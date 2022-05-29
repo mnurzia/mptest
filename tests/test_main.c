@@ -15,6 +15,7 @@ TEST(t_fuzz) {
 }
 
 TEST(t_assert_catch) {
+    ASSERT_ASSERT(MPTEST_INJECT_ASSERT(0));
     PASS();
 }
 

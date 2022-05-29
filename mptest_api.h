@@ -247,10 +247,7 @@ MN_API void mptest__assert_pass(struct mptest__state* state, const char* msg, co
 
 MN_API void mptest_assert_fail_breakpoint(void);
 
-#if MPTEST_USE_LONGJMP
-MN_API void mptest__longjmp_exec(struct mptest__state* state,
-    enum mptest__longjmp_reason reason, const char* file, int line, const char* msg);
-#endif
+MN_API void mptest__catch_assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 
 #if MPTEST_USE_LEAKCHECK
 MN_API void* mptest__leakcheck_hook_malloc(struct mptest__state* state,
@@ -407,10 +404,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
             do {                                                              \
                 if (!(expr)) {                                                \
                     mptest_assert_fail_breakpoint(); \
-                    mptest__state_g.fail_data.string_data = #expr;            \
-                    mptest__longjmp_exec(&mptest__state_g,                    \
-                        MPTEST__LONGJMP_REASON_ASSERT_FAIL, __FILE__,         \
-                        __LINE__, msg);                                \
+                    mptest__catch_assert_fail(&mptest__state_g, msg, #expr, __FILE__, __LINE__); \
                 }                                                             \
             } while (0)
 
@@ -422,13 +416,10 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
                     & MPTEST__LONGJMP_REASON_ASSERT_FAIL) {                   \
                     if (!(expr)) {                                            \
                         mptest_assert_fail_breakpoint(); \
-                        mptest__state_g.fail_data.string_data = #expr;        \
-                        mptest__longjmp_exec(&mptest__state_g,                \
-                            MPTEST__LONGJMP_REASON_ASSERT_FAIL, __FILE__,     \
-                            __LINE__, msg);                            \
+                        mptest__catch_assert_fail(&mptest__state_g, msg, #expr, __FILE__, __LINE__); \
                     }                                                         \
                 } else {                                                      \
-                    MPTEST_ASSERT(expr);                              \
+                    MN_ASSERT(expr);                              \
                 }                                                             \
             } while (0)
 

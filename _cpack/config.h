@@ -110,4 +110,10 @@
 #define MPTEST_USE_FUZZ 1
 #endif
 
+/* mptest */
+/* Help text */
+#if !defined(MPTEST_DETECT_UNCAUGHT_ASSERTS)
+#define MPTEST_DETECT_UNCAUGHT_ASSERTS 1
+#endif
+
 #endif /* MN__MPTEST_CONFIG_H */

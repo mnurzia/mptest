@@ -13,6 +13,8 @@ MN_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
 
 MN_INTERNAL void mptest__longjmp_init(struct mptest__state* state);
 MN_INTERNAL void mptest__longjmp_destroy(struct mptest__state* state);
+MN_INTERNAL void mptest__longjmp_exec(struct mptest__state* state,
+    enum mptest__longjmp_reason reason, const char* file, int line, const char* msg);
 
 #endif
 

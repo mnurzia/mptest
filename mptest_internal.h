@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 
-MN_INTERNAL enum mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func);
+MN_INTERNAL mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func);
 MN_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
 
 #if MPTEST_USE_LONGJMP
@@ -103,7 +103,7 @@ MN_INTERNAL int mptest__aparse_match_suite_name(struct mptest__state* state, con
 
 #if MPTEST_USE_FUZZ
 MN_INTERNAL void mptest__fuzz_init(struct mptest__state* state);
-MN_INTERNAL enum mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func);
+MN_INTERNAL mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func);
 MN_INTERNAL void mptest__fuzz_print(struct mptest__state* state);
 #endif
 

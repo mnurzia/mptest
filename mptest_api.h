@@ -64,16 +64,14 @@ typedef enum mptest__longjmp_reason
 typedef unsigned long mptest_rand;
 #endif
 
-/* Test result types. */
-typedef enum mptest__result
-{
-    MPTEST__RESULT_PASS = 0,
-    MPTEST__RESULT_FAIL = -1,
-    /* an uncaught error that caused a `longjmp()` out of the test */
-    /* or a miscellaneous error like a sym syntax error */
-    MPTEST__RESULT_ERROR = -2,
-    MPTEST__RESULT_SKIPPED = -3
-} mptest__result;
+typedef int mptest__result;
+
+#define MPTEST__RESULT_PASS 0
+#define MPTEST__RESULT_FAIL -1
+/* an uncaught error that caused a `longjmp()` out of the test */
+/* or a miscellaneous error like a sym syntax error */
+#define MPTEST__RESULT_ERROR -2
+#define MPTEST__RESULT_SKIPPED -3
 
 /* The different ways a test can fail. */
 typedef enum mptest__fail_reason
@@ -232,7 +230,7 @@ struct mptest__state {
 extern struct mptest__state mptest__state_g;
 
 /* Test function signature */
-typedef enum mptest__result (*mptest__test_func)(void);
+typedef mptest__result (*mptest__test_func)(void);
 typedef void (*mptest__suite_func)(void);
 
 /* Internal functions that API macros call */
@@ -311,7 +309,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
  *     ASSERT(...);
  *     PASS();
  * } */
-#define TEST(name) enum mptest__result mptest__test_##name(void)
+#define TEST(name) mptest__result mptest__test_##name(void)
 
 /* Define a suite. */
 /* Usage:

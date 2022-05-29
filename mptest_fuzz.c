@@ -23,10 +23,10 @@ MN_API void mptest__fuzz_next_test(struct mptest__state* state, int iterations) 
     state->fuzz_active = 1;
 }
 
-MN_INTERNAL enum mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func) {
+MN_INTERNAL mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func) {
     int i = 0;
     int iters = 1;
-    enum mptest__result res = MPTEST__RESULT_PASS;
+    mptest__result res = MPTEST__RESULT_PASS;
     /* Reset fail variables */
     state->fuzz_fail_iteration = 0;
     state->fuzz_fail_seed = 0;

@@ -140,7 +140,7 @@ MN_INTERNAL int mptest__streq(const char* a, const char* b)
 }
 
 /* Ran when setting up for a test before it is run. */
-MN_INTERNAL enum mptest__result mptest__state_before_test(
+MN_INTERNAL mptest__result mptest__state_before_test(
     struct mptest__state* state, mptest__test_func test_func,
     const char* test_name)
 {
@@ -167,8 +167,8 @@ MN_INTERNAL enum mptest__result mptest__state_before_test(
 #endif
 }
 
-MN_INTERNAL enum mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func) {
-    enum mptest__result res;
+MN_INTERNAL mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func) {
+    mptest__result res;
 #if MPTEST_USE_LONGJMP
     if (MN_SETJMP(state->longjmp_test_context) == 0) {
         res = test_func();
@@ -183,7 +183,7 @@ MN_INTERNAL enum mptest__result mptest__state_do_run_test(struct mptest__state* 
 
 /* Ran when a test is over. */
 MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
-    enum mptest__result                                         res)
+    mptest__result                                         res)
 {
 #if MPTEST_USE_LEAKCHECK
     int has_leaks;
@@ -411,7 +411,7 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
 }
 
 MN_API void mptest__run_test(struct mptest__state* state, mptest__test_func test_func, const char* test_name) {
-    enum mptest__result res = mptest__state_before_test(state, test_func, test_name);
+    mptest__result res = mptest__state_before_test(state, test_func, test_name);
     mptest__state_after_test(state, res);
 }
 

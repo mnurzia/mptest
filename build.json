@@ -120,6 +120,14 @@
                 "test shuffling support."
             ],
             "default": "1"
+        },
+        "MPTEST_DETECT_UNCAUGHT_ASSERTS": {
+            "type": "flag",
+            "help": [
+                "Set MPTEST_DETECT_UNCAUGHT_ASSERTS to 1 if you want uncaught ",
+                "asserts to be gracefully detected."
+            ],
+            "default": "1"
         }
     },
     "version": "0.1.0"

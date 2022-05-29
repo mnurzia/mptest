@@ -249,7 +249,8 @@ MN_API void mptest__state_before_suite(struct mptest__state* state,
     const char*                                                   suite_name);
 MN_API void mptest__state_after_suite(struct mptest__state* state);
 
-MN_API void mptest__assert_do_failure(const char* msg, const char* assert_expr, const char* file, int line);
+MN_API void mptest__assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
+MN_API void mptest__assert_pass(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 
 MN_API void mptest_assert_fail(void);
 
@@ -280,12 +281,12 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 
 #define _ASSERT_PASS_BEHAVIOR(expr, msg) \
     do { \
-        mptest__state_g.assertions++; \
+        mptest__assert_pass(&mptest__state_g, msg, #expr, __FILE__, __LINE__); \
     } while (0) 
 
 #define _ASSERT_FAIL_BEHAVIOR(expr, msg)                                      \
     do {                                                                      \
-        mptest__assert_do_failure(#msg, #expr,   \
+        mptest__assert_fail(#msg, #expr,   \
             __FILE__, __LINE__);                                              \
         return MPTEST__RESULT_FAIL;                                           \
     } while (0)

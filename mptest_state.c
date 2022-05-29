@@ -443,14 +443,23 @@ MN_API void mptest__state_after_suite(struct mptest__state* state)
     state->indent_lvl--;
 }
 
+/* Fills state with information on pass. */
+MN_API void mptest__assert_pass(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line) {
+    MN__UNUSED(msg);
+    MN__UNUSED(assert_expr);
+    MN__UNUSED(file);
+    MN__UNUSED(line);
+    state->assertions++;
+}
+
 /* Fills state with information on failure. */
-MN_API void mptest__assert_do_failure(const char* msg, const char* assert_expr, const char* file, int line)
+MN_API void mptest__assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line)
 {
-    mptest__state_g.fail_reason = MPTEST__FAIL_REASON_ASSERT_FAILURE;
-    mptest__state_g.fail_msg    = msg;
-    mptest__state_g.fail_data.string_data = assert_expr;
-    mptest__state_g.fail_file   = file;
-    mptest__state_g.fail_line   = line;
+    state->fail_reason = MPTEST__FAIL_REASON_ASSERT_FAILURE;
+    state->fail_msg    = msg;
+    state->fail_data.string_data = assert_expr;
+    state->fail_file   = file;
+    state->fail_line   = line;
 }
 
 /* Dummy function to break on for assert failures */

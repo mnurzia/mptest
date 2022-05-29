@@ -14,11 +14,16 @@ TEST(t_fuzz) {
     PASS();
 }
 
+TEST(t_assert_catch) {
+    PASS();
+}
+
 int main(int argc, const char* const* argv) {
     MPTEST_MAIN_BEGIN_ARGS(argc, argv);
     RUN_TEST(t_pass);
     RUN_SUITE(s_pass);
     FUZZ_TEST(t_fuzz);
+    RUN_TEST(t_assert_catch);
     MPTEST_MAIN_END();
     return 0;
 }

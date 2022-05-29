@@ -245,7 +245,7 @@ MN_API void mptest__run_suite(struct mptest__state* state, mptest__suite_func su
 MN_API void mptest__assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 MN_API void mptest__assert_pass(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 
-MN_API void mptest_assert_fail(void);
+MN_API void mptest_assert_fail_breakpoint(void);
 
 #if MPTEST_USE_LONGJMP
 MN_API void mptest__longjmp_exec(struct mptest__state* state,
@@ -387,7 +387,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
         do {                                                                  \
             mptest__state_g.longjmp_checking                                  \
                 = MPTEST__LONGJMP_REASON_ASSERT_FAIL;                         \
-            if (MPTEST_SETJMP(mptest__state_g.longjmp_assert_context) == 0) { \
+            if (MN_SETJMP(mptest__state_g.longjmp_assert_context) == 0) { \
                 stmt;                                                         \
                 mptest__state_g.longjmp_checking = 0;                         \
                 _ASSERT_FAIL_BEHAVIOR(                                        \
@@ -406,7 +406,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
         #define MPTEST_INJECT_ASSERTm(expr, msg)                               \
             do {                                                              \
                 if (!(expr)) {                                                \
-                    mptest_assert_fail(); \
+                    mptest_assert_fail_breakpoint(); \
                     mptest__state_g.fail_data.string_data = #expr;            \
                     mptest__longjmp_exec(&mptest__state_g,                    \
                         MPTEST__LONGJMP_REASON_ASSERT_FAIL, __FILE__,         \
@@ -421,7 +421,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
                 if (mptest__state_g.longjmp_checking                          \
                     & MPTEST__LONGJMP_REASON_ASSERT_FAIL) {                   \
                     if (!(expr)) {                                            \
-                        mptest_assert_fail(); \
+                        mptest_assert_fail_breakpoint(); \
                         mptest__state_g.fail_data.string_data = #expr;        \
                         mptest__longjmp_exec(&mptest__state_g,                \
                             MPTEST__LONGJMP_REASON_ASSERT_FAIL, __FILE__,     \

@@ -473,6 +473,6 @@ MN_API void mptest__assert_fail(struct mptest__state* state, const char* msg, co
 }
 
 /* Dummy function to break on for assert failures */
-MN_API void mptest_assert_fail() {
+MN_API void mptest_assert_fail_breakpoint() {
     return;
 }

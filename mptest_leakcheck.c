@@ -305,4 +305,8 @@ MN_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     return out_ptr;
 }
 
+MN_API void mptest__leakcheck_set(struct mptest__state* state, int on) {
+    state->test_leak_checking = on;
+}
+
 #endif

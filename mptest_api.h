@@ -258,6 +258,7 @@ MN_API void  mptest__leakcheck_hook_free(struct mptest__state* state,
      const char* file, int line, void* ptr);
 MN_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     const char* file, int line, void* old_ptr, size_t new_size);
+MN_API void mptest__leakcheck_set(struct mptest__state* state, int on);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -446,12 +447,10 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
             (old_ptr), (new_size))
 
     #define MPTEST_ENABLE_LEAK_CHECKING()                                     \
-        mptest__state_g.test_leak_checking = 1;
+        mptest__leakcheck_set(&mptest__state_g, 1)
 
     #define MPTEST_DISABLE_LEAK_CHECKING()                                    \
-        mptest__state_g.test_leak_checking = 0;
-    
-    #define TOTAL_ALLOCATIONS() (mptest__state_g.total_allocations)
+        mptest__leakcheck_set(&mptest__state_g, 0)
 
 #else
 

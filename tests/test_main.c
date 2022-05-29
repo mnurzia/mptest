@@ -32,6 +32,12 @@ TEST(t_assert_catch_SHOULD_FAIL) {
     PASS();
 }
 
+TEST(t_enable_disable_leakchecking) {
+    MPTEST_ENABLE_LEAK_CHECKING();
+    MPTEST_DISABLE_LEAK_CHECKING();
+    PASS();
+}
+
 int main(int argc, const char* const* argv) {
     MPTEST_MAIN_BEGIN_ARGS(argc, argv);
     RUN_TEST(t_pass);
@@ -39,6 +45,7 @@ int main(int argc, const char* const* argv) {
     FUZZ_TEST(t_fuzz);
     RUN_TEST(t_assert_catch);
     RUN_TEST(t_assert_catch_SHOULD_FAIL);
+    RUN_TEST(t_enable_disable_leakchecking);
     MPTEST_MAIN_END();
     return 0;
 }

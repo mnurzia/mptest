@@ -274,12 +274,12 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 
 #define _ASSERT_PASS_BEHAVIOR(expr, msg) \
     do { \
-        mptest__assert_pass(&mptest__state_g, msg, #expr, __FILE__, __LINE__); \
+        mptest__assert_pass(&mptest__state_g, #msg, #expr, __FILE__, __LINE__); \
     } while (0) 
 
 #define _ASSERT_FAIL_BEHAVIOR(expr, msg)                                      \
     do {                                                                      \
-        mptest__assert_fail(#msg, #expr,   \
+        mptest__assert_fail(&mptest__state_g, #msg, #expr,   \
             __FILE__, __LINE__);                                              \
         return MPTEST__RESULT_FAIL;                                           \
     } while (0)
@@ -300,7 +300,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
         if (!((lhs)op(rhs))) {                                                \
             _ASSERT_FAIL_BEHAVIOR(lhs op rhs, lhs op rhs);                    \
         } else {                                                              \
-            _ASSERT_PASS_BEHAVIOR(lhs op rhs, msg);                           \
+            _ASSERT_PASS_BEHAVIOR(lhs op rhs, lhs op rhs);                    \
         }                                                                     \
     } while (0)
 

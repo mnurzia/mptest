@@ -269,6 +269,7 @@ MN_API int mptest__state_init_argv(struct mptest__state* state,
 #endif
 
 #if MPTEST_USE_FUZZ
+MN_API void mptest__fuzz_next_test(struct mptest__state* state, int iterations);
 MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 #endif
 
@@ -342,8 +343,7 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 /* Run a test a number of times, changing the RNG state each time. */
 #define FUZZ_TEST(test) \
     do { \
-        mptest__state_g.fuzz_iterations = MPTEST__FUZZ_DEFAULT_ITERATIONS; \
-        mptest__state_g.fuzz_active = 1; \
+        mptest__fuzz_next_test(&mptest__state_g, MPTEST__FUZZ_DEFAULT_ITERATIONS); \
         RUN_TEST(test); \
     } while (0)
 

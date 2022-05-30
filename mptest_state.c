@@ -160,10 +160,23 @@ MN_INTERNAL mptest__result mptest__state_before_test(
         return MPTEST__RESULT_SKIPPED;
     }
 #endif
+#if MPTEST_USE_LEAKCHECK 
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OFF
+        || state->test_leak_checking == MPTEST__LEAKCHECK_MODE_ON) {
+#if MPTEST_USE_FUZZ
+        return mptest__fuzz_run_test(state, test_func);
+#else
+        return mptest__state_do_run_test(state, test_func);
+#endif
+    } else {
+        return mptest__leakcheck_oom_run_test(state, test_func);
+    }
+#else
 #if MPTEST_USE_FUZZ
     return mptest__fuzz_run_test(state, test_func);
 #else
     return mptest__state_do_run_test(state, test_func);
+#endif
 #endif
 }
 

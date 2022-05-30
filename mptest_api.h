@@ -21,9 +21,9 @@ typedef int mptest__result;
 typedef int mptest__leakcheck_mode;
 
 #define MPTEST__LEAKCHECK_MODE_OFF 0
-#define MPTEST__LEAKCHECK_MODE_ON 0
-#define MPTEST__LEAKCHECK_MODE_OOM_ONE 0
-#define MPTEST__LEAKCHECK_MODE_OOM_SET 0
+#define MPTEST__LEAKCHECK_MODE_ON 1
+#define MPTEST__LEAKCHECK_MODE_OOM_ONE 2
+#define MPTEST__LEAKCHECK_MODE_OOM_SET 3
 #endif
 
 /* Test function signature */
@@ -243,10 +243,16 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
             (old_ptr), (new_size))
 
     #define MPTEST_ENABLE_LEAK_CHECKING()                                     \
-        mptest__leakcheck_set(&mptest__state_g, 1)
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_ON)
+
+    #define MPTEST_ENABLE_OOM_ONE()                                     \
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_OOM_ONE)
+    
+    #define MPTEST_ENABLE_OOM_SET()                                     \
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_OOM_SET)
 
     #define MPTEST_DISABLE_LEAK_CHECKING()                                    \
-        mptest__leakcheck_set(&mptest__state_g, 0)
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_OFF)
 
 #else
 

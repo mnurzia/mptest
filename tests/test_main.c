@@ -51,6 +51,15 @@ TEST(t_leak_realloc_SHOULD_FAIL) {
     PASS();
 }
 
+#include <stdio.h>
+
+TEST(t_oom_initial) {
+    void* a = MPTEST_INJECT_MALLOC(5);
+    printf("%p\n", a);
+    MPTEST_INJECT_FREE(a);
+    PASS();
+}
+
 int main(int argc, const char* const* argv) {
     MPTEST_MAIN_BEGIN_ARGS(argc, argv);
     RUN_TEST(t_pass);
@@ -62,6 +71,9 @@ int main(int argc, const char* const* argv) {
     MPTEST_ENABLE_LEAK_CHECKING();
     RUN_TEST(t_leak_malloc_SHOULD_FAIL);
     RUN_TEST(t_leak_realloc_SHOULD_FAIL);
+    MPTEST_DISABLE_LEAK_CHECKING();
+    MPTEST_ENABLE_OOM_ONE();
+    RUN_TEST(t_oom_initial);
     MPTEST_DISABLE_LEAK_CHECKING();
     MPTEST_MAIN_END();
     return 0;

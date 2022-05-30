@@ -344,6 +344,7 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* 
     mptest__result res = MPTEST__RESULT_PASS;
     state->oom_fail_call = -1;
     state->oom_failed = 0;
+    mptest__leakcheck_reset(state);
     res = mptest__state_do_run_test(state, test_func);
     max_iter = state->total_calls;
     if (res) {
@@ -352,6 +353,8 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* 
     }
     for (i = 0; i < max_iter; i++) {
         int should_finish = 0;
+        mptest__leakcheck_reset(state);
+        state->oom_fail_call = i;
         res = mptest__state_do_run_test(state, test_func);
         if (res != MPTEST__RESULT_PASS) {
             should_finish = 1;
@@ -363,7 +366,6 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* 
 #endif
         if (should_finish) {
             /* Save fail context */
-            state->oom_fail_call = i;
             state->oom_failed = 1;
             break;
         }

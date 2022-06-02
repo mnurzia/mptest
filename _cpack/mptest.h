@@ -110,6 +110,12 @@
 #define MPTEST_USE_FUZZ 1
 #endif
 
+/* mptest */
+/* Help text */
+#if !defined(MPTEST_DETECT_UNCAUGHT_ASSERTS)
+#define MPTEST_DETECT_UNCAUGHT_ASSERTS 1
+#endif
+
 /* bits/types/size */
 typedef MPTEST_SIZE_TYPE mptest_size;
 
@@ -252,257 +258,46 @@ MPTEST_API aparse_error aparse_parse(aparse_state* state, int argc, const char* 
 /* Forward declaration */
 struct mptest__state;
 
-/* How assert checking works (and why we need longjmp for it):
- * 1. You use the function ASSERT_ASSERT(statement) in your test code.
- * 2. Under the hood, ASSERT_ASSERT setjmps the current test, and runs the
- *    statement until an assert within the program fails.
- * 3. The assert hook longjmps out of the code into the previous setjmp from
- *    step (2).
- * 4. mptest recognizes this jump back and passes the test.
- * 5. If the jump back doesn't happen, mptest recognizes this too and fails the
- *    test, expecting an assertion failure. */
-#if MPTEST_USE_LONGJMP
-    #include <setjmp.h>
-
-/* Enumeration of the reasons a `longjmp()` can happen from within a test.
- * When running an assertion like `ASSERT_ASSERT()`, we check the returned
- * jump reason to ensure that an assertion failure happened and not, e.g., a
- * malloc failure. */
-typedef enum mptest__longjmp_reason
-{
-    MPTEST__LONGJMP_REASON_NONE,
-    /* An assertion failure. */
-    MPTEST__LONGJMP_REASON_ASSERT_FAIL = 1,
-    #if MPTEST_USE_LEAKCHECK
-    /* `malloc()` (the real one) *actually* returned NULL. As in, an actual
-     * error. */
-    MPTEST__LONGJMP_REASON_MALLOC_REALLY_RETURNED_NULL = 2,
-    /* You passed a NULL pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_NULL = 4,
-    /* You passed an invalid pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_INVALID = 8,
-    /* You passed an already-freed pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_FREED = 16,
-    /* You passed an already-reallocated pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_REALLOCED = 32,
-    /* You passed a NULL pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_NULL = 64,
-    /* You passed an invalid pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_INVALID = 128,
-    /* You passed an already-freed pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_FREED = 256,
-    /* You passed an already-reallocated pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_REALLOCED = 512,
-    #endif
-    MPTEST__LONGJMP_REASON_LAST
-} mptest__longjmp_reason;
-#endif
-
-#if MPTEST_USE_TIME
-    #include <time.h>
-#endif
-
-#if MPTEST_USE_APARSE
-    #define MPTEST__APARSE_ARG_COUNT 16
-#endif
-
-#if MPTEST_USE_FUZZ
-typedef unsigned long mptest_rand;
-#endif
-
-/* Test result types. */
-typedef enum mptest__result
-{
-    MPTEST__RESULT_PASS = 0,
-    MPTEST__RESULT_FAIL = -1,
-    /* an uncaught error that caused a `longjmp()` out of the test */
-    /* or a miscellaneous error like a sym syntax error */
-    MPTEST__RESULT_ERROR = -2,
-    MPTEST__RESULT_SKIPPED = -3
-} mptest__result;
-
-/* The different ways a test can fail. */
-typedef enum mptest__fail_reason
-{
-    MPTEST__FAIL_REASON_ASSERT_FAILURE,
-#if MPTEST_USE_DYN_ALLOC
-    MPTEST__FAIL_REASON_NOMEM,
-#endif
-#if MPTEST_USE_LEAKCHECK
-    MPTEST__FAIL_REASON_LEAKED,
-#endif
-#if MPTEST_USE_SYM
-    MPTEST__FAIL_REASON_SYM_INEQUALITY,
-    MPTEST__FAIL_REASON_SYM_SYNTAX,
-    MPTEST__FAIL_REASON_SYM_DESERIALIZE,
-#endif
-    MPTEST__FAIL_REASON_LAST
-} mptest__fail_reason;
-
-/* Type representing a function to be called whenever a suite is set up or torn
- * down. */
-typedef void (*mptest__suite_callback)(void* data);
-
-#if MPTEST_USE_SYM
-typedef struct mptest_sym mptest_sym;
-
-typedef struct mptest__sym_fail_data {
-    mptest_sym* sym_actual;
-    mptest_sym* sym_expected;
-} mptest__sym_fail_data;
-
-typedef struct mptest__sym_syntax_error_data {
-    const char* err_msg;
-    mptest_size err_pos;
-} mptest__sym_syntax_error_data;
-#endif
-
-/* Data describing how the test failed. */
-typedef union mptest__fail_data {
-    const char* string_data;
-#if MPTEST_USE_LEAKCHECK
-    void* memory_block;
-#endif
-#if MPTEST_USE_SYM
-    mptest__sym_fail_data sym_fail_data;
-    mptest__sym_syntax_error_data sym_syntax_error_data;
-#endif
-} mptest__fail_data;
-
-#if MPTEST_USE_APARSE
-typedef struct mptest__aparse_name mptest__aparse_name;
-
-struct mptest__aparse_name {
-    const char* name;
-    mptest_size name_len;
-    mptest__aparse_name* next;
-};
-
-typedef struct mptest__aparse_state {
-    aparse_state aparse;
-    /* -l, --leak-check : whether to enable leak checking or not */
-    int opt_leak_check;
-    /* -t, --test : the test name(s) to search for and run */
-    mptest__aparse_name* opt_test_name_head;
-    mptest__aparse_name* opt_test_name_tail;
-    /* -s, --suite : the suite name(s) to search for and run */
-    mptest__aparse_name* opt_suite_name_head;
-    mptest__aparse_name* opt_suite_name_tail;
-} mptest__aparse_state;
-#endif
-
-struct mptest__state {
-    /* Total number of assertions */
-    int assertions;
-    /* Total number of tests */
-    int total;
-    /* Total number of passes, fails, and errors */
-    int passes;
-    int fails;
-    int errors;
-    /* Total number of suite passes and fails */
-    int suite_passes;
-    int suite_fails;
-    /* 1 if the current suite failed, 0 if not */
-    int suite_failed;
-    /* Suite setup/teardown callbacks */
-    mptest__suite_callback suite_test_setup_cb;
-    mptest__suite_callback suite_test_teardown_cb;
-    /* Names of the current running test/suite */
-    const char* current_test;
-    const char* current_suite;
-    /* Reason for failing a test */
-    mptest__fail_reason fail_reason;
-    /* Fail diagnostics */
-    const char* fail_msg;
-    const char* fail_file;
-    int         fail_line;
-    /* Stores information about the failure. */
-    /* Assert expression that caused the fail, if `fail_reason` ==
-     * `MPTEST__FAIL_REASON_ASSERT_FAILURE` */
-    /* Pointer to offending allocation, if `longjmp_reason` is one of the
-     * malloc fail reasons */
-    mptest__fail_data fail_data;
-    /* Indentation level (used for output) */
-    int indent_lvl;
-
-#if MPTEST_USE_LONGJMP
-    /* Saved setjmp context (used for testing asserts, etc.) */
-    MPTEST_JMP_BUF longjmp_assert_context;
-    /* Saved setjmp context (used to catch actual errors during testing) */
-    MPTEST_JMP_BUF longjmp_test_context;
-    /* 1 if we are checking for a jump, 0 if not. Used so that if an assertion
-     * *accidentally* goes off, we can catch it. */
-    mptest__longjmp_reason longjmp_checking;
-    /* Reason for jumping (assertion failure, malloc/free failure, etc) */
-    mptest__longjmp_reason longjmp_reason;
-#endif
-
-#if MPTEST_USE_LEAKCHECK
-    /* 1 if current test should be audited for leaks, 0 otherwise. */
-    int test_leak_checking;
-    /* First and most recent blocks allocated. */
-    struct mptest__leakcheck_block* first_block;
-    struct mptest__leakcheck_block* top_block;
-    /* Total number of allocations. */
-    int total_allocations;
-#endif
-
-#if MPTEST_USE_TIME
-    /* Start times that will be compared against later */
-    clock_t program_start_time;
-    clock_t suite_start_time;
-    clock_t test_start_time;
-#endif
-
-#if MPTEST_USE_APARSE
-    mptest__aparse_state aparse_state;
-#endif
-
-#if MPTEST_USE_FUZZ
-    /* State of the random number generator */
-    mptest_rand rand_state;
-    /* Whether or not the current test should be fuzzed */
-    int fuzz_active;
-    /* Whether or not the current test failed on a fuzz */
-    int fuzz_failed;
-    /* Number of iterations to run the next test for */
-    int fuzz_iterations;
-    /* Fuzz failure context */
-    int fuzz_fail_iteration;
-    mptest_rand fuzz_fail_seed;
-#endif
-};
-
 /* Global state object, used in all macros. */
 extern struct mptest__state mptest__state_g;
 
+typedef int mptest__result;
+
+#define MPTEST__RESULT_PASS 0
+#define MPTEST__RESULT_FAIL -1
+/* an uncaught error that caused a `longjmp()` out of the test */
+/* or a miscellaneous error like a sym syntax error */
+#define MPTEST__RESULT_ERROR -2
+
+#if MPTEST_USE_LEAKCHECK
+typedef int mptest__leakcheck_mode;
+
+#define MPTEST__LEAKCHECK_MODE_OFF 0
+#define MPTEST__LEAKCHECK_MODE_ON 1
+#define MPTEST__LEAKCHECK_MODE_OOM_ONE 2
+#define MPTEST__LEAKCHECK_MODE_OOM_SET 3
+#endif
+
 /* Test function signature */
-typedef enum mptest__result (*mptest__test_func)(void);
+typedef mptest__result (*mptest__test_func)(void);
 typedef void (*mptest__suite_func)(void);
 
 /* Internal functions that API macros call */
 MPTEST_API void mptest__state_init(struct mptest__state* state);
 MPTEST_API void mptest__state_destroy(struct mptest__state* state);
 MPTEST_API void mptest__state_report(struct mptest__state* state);
-MPTEST_API enum mptest__result mptest__state_before_test(
-    struct mptest__state* state, mptest__test_func test_func,
-    const char* test_name);
-MPTEST_API void mptest__state_after_test(struct mptest__state* state,
-    enum mptest__result                                         res);
-MPTEST_API void mptest__state_before_suite(struct mptest__state* state,
-    mptest__suite_func suite_func,
-    const char*                                                   suite_name);
-MPTEST_API void mptest__state_after_suite(struct mptest__state* state);
+MPTEST_API void mptest__run_test(struct mptest__state* state, mptest__test_func test_func, const char* test_name);
+MPTEST_API void mptest__run_suite(struct mptest__state* state, mptest__suite_func suite_func, const char* suite_name);
 
-MPTEST_API void mptest__assert_do_failure(const char* msg, const char* assert_expr, const char* file, int line);
+MPTEST_API void mptest__assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
+MPTEST_API void mptest__assert_pass(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 
-MPTEST_API void mptest_assert_fail(void);
+MPTEST_API void mptest_assert_fail_breakpoint(void);
+MPTEST_API void mptest_uncaught_assert_fail_breakpoint(void);
 
-#if MPTEST_USE_LONGJMP
-MPTEST_API void mptest__longjmp_exec(struct mptest__state* state,
-    enum mptest__longjmp_reason reason, const char* file, int line, const char* msg);
-#endif
+MPTEST_API MPTEST_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state);
+MPTEST_API void mptest__catch_assert_end(struct mptest__state* state);
+MPTEST_API void mptest__catch_assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line);
 
 #if MPTEST_USE_LEAKCHECK
 MPTEST_API void* mptest__leakcheck_hook_malloc(struct mptest__state* state,
@@ -511,6 +306,8 @@ MPTEST_API void  mptest__leakcheck_hook_free(struct mptest__state* state,
      const char* file, int line, void* ptr);
 MPTEST_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     const char* file, int line, void* old_ptr, size_t new_size);
+MPTEST_API void mptest__leakcheck_set(struct mptest__state* state, int on);
+MPTEST_API void mptest_malloc_null_breakpoint(void);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -521,17 +318,19 @@ MPTEST_API int mptest__state_init_argv(struct mptest__state* state,
 #endif
 
 #if MPTEST_USE_FUZZ
+typedef unsigned long mptest_rand;
+MPTEST_API void mptest__fuzz_next_test(struct mptest__state* state, int iterations);
 MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 #endif
 
 #define _ASSERT_PASS_BEHAVIOR(expr, msg) \
     do { \
-        mptest__state_g.assertions++; \
+        mptest__assert_pass(&mptest__state_g, #msg, #expr, __FILE__, __LINE__); \
     } while (0) 
 
 #define _ASSERT_FAIL_BEHAVIOR(expr, msg)                                      \
     do {                                                                      \
-        mptest__assert_do_failure(#msg, #expr,   \
+        mptest__assert_fail(&mptest__state_g, #msg, #expr,   \
             __FILE__, __LINE__);                                              \
         return MPTEST__RESULT_FAIL;                                           \
     } while (0)
@@ -552,7 +351,7 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
         if (!((lhs)op(rhs))) {                                                \
             _ASSERT_FAIL_BEHAVIOR(lhs op rhs, lhs op rhs);                    \
         } else {                                                              \
-            _ASSERT_PASS_BEHAVIOR(lhs op rhs, msg);                           \
+            _ASSERT_PASS_BEHAVIOR(lhs op rhs, lhs op rhs);                    \
         }                                                                     \
     } while (0)
 
@@ -562,7 +361,7 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
  *     ASSERT(...);
  *     PASS();
  * } */
-#define TEST(name) enum mptest__result mptest__test_##name(void)
+#define TEST(name) mptest__result mptest__test_##name(void)
 
 /* Define a suite. */
 /* Usage:
@@ -578,17 +377,13 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 /* Run a test. Should only be used from within a suite. */
 #define RUN_TEST(test)                                                        \
     do {                                                                      \
-        enum mptest__result res;                                              \
-        res = mptest__state_before_test(&mptest__state_g,                     \
-            mptest__test_##test, #test);                                      \
-        mptest__state_after_test(&mptest__state_g, res);                      \
+        mptest__run_test(&mptest__state_g, mptest__test_##test, #test); \
     } while (0)
 
 /* Run a suite. */
 #define RUN_SUITE(suite)                                                      \
     do {                                                                      \
-        mptest__state_before_suite(&mptest__state_g, mptest__suite_##suite, #suite);   \
-        mptest__state_after_suite(&mptest__state_g);                          \
+        mptest__run_suite(&mptest__state_g, mptest__suite_##suite, #suite); \
     } while (0)
 
 #if MPTEST_USE_FUZZ
@@ -598,8 +393,7 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 /* Run a test a number of times, changing the RNG state each time. */
 #define FUZZ_TEST(test) \
     do { \
-        mptest__state_g.fuzz_iterations = MPTEST__FUZZ_DEFAULT_ITERATIONS; \
-        mptest__state_g.fuzz_active = 1; \
+        mptest__fuzz_next_test(&mptest__state_g, MPTEST__FUZZ_DEFAULT_ITERATIONS); \
         RUN_TEST(test); \
     } while (0)
 
@@ -641,15 +435,13 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
     /* Assert that an assertion failure will occur within statement `stmt`. */
     #define ASSERT_ASSERTm(stmt, msg)                                         \
         do {                                                                  \
-            mptest__state_g.longjmp_checking                                  \
-                = MPTEST__LONGJMP_REASON_ASSERT_FAIL;                         \
-            if (MPTEST_SETJMP(mptest__state_g.longjmp_assert_context) == 0) { \
+            if (MPTEST_SETJMP(*mptest__catch_assert_begin(&mptest__state_g)) == 0) { \
                 stmt;                                                         \
-                mptest__state_g.longjmp_checking = 0;                         \
+                mptest__catch_assert_end(&mptest__state_g); \
                 _ASSERT_FAIL_BEHAVIOR(                                        \
                     "<runtime-assert-checked-function> " #stmt, msg);         \
             } else {                                                          \
-                mptest__state_g.longjmp_checking = 0;                         \
+                mptest__catch_assert_end(&mptest__state_g); \
                 _ASSERT_PASS_BEHAVIOR(                                        \
                     "<runtime-assert-checked-function> " #stmt, msg);         \
             }                                                                 \
@@ -662,11 +454,8 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
         #define MPTEST_INJECT_ASSERTm(expr, msg)                               \
             do {                                                              \
                 if (!(expr)) {                                                \
-                    mptest_assert_fail(); \
-                    mptest__state_g.fail_data.string_data = #expr;            \
-                    mptest__longjmp_exec(&mptest__state_g,                    \
-                        MPTEST__LONGJMP_REASON_ASSERT_FAIL, __FILE__,         \
-                        __LINE__, msg);                                \
+                    mptest_uncaught_assert_fail_breakpoint(); \
+                    mptest__catch_assert_fail(&mptest__state_g, msg, #expr, __FILE__, __LINE__); \
                 }                                                             \
             } while (0)
 
@@ -677,11 +466,8 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
                 if (mptest__state_g.longjmp_checking                          \
                     & MPTEST__LONGJMP_REASON_ASSERT_FAIL) {                   \
                     if (!(expr)) {                                            \
-                        mptest_assert_fail(); \
-                        mptest__state_g.fail_data.string_data = #expr;        \
-                        mptest__longjmp_exec(&mptest__state_g,                \
-                            MPTEST__LONGJMP_REASON_ASSERT_FAIL, __FILE__,     \
-                            __LINE__, msg);                            \
+                        mptest_uncaught_assert_fail_breakpoint(); \
+                        mptest__catch_assert_fail(&mptest__state_g, msg, #expr, __FILE__, __LINE__); \
                     }                                                         \
                 } else {                                                      \
                     MPTEST_ASSERT(expr);                              \
@@ -711,12 +497,16 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
             (old_ptr), (new_size))
 
     #define MPTEST_ENABLE_LEAK_CHECKING()                                     \
-        mptest__state_g.test_leak_checking = 1;
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_ON)
+
+    #define MPTEST_ENABLE_OOM_ONE()                                     \
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_OOM_ONE)
+    
+    #define MPTEST_ENABLE_OOM_SET()                                     \
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_OOM_SET)
 
     #define MPTEST_DISABLE_LEAK_CHECKING()                                    \
-        mptest__state_g.test_leak_checking = 0;
-    
-    #define TOTAL_ALLOCATIONS() (mptest__state_g.total_allocations)
+        mptest__leakcheck_set(&mptest__state_g, MPTEST__LEAKCHECK_MODE_OFF)
 
 #else
 
@@ -754,6 +544,8 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 #endif
 
 #if MPTEST_USE_SYM
+
+typedef struct mptest_sym mptest_sym;
 
 typedef struct mptest_sym_build {
     mptest_sym* sym;
@@ -1197,52 +989,65 @@ MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, 
 
 #define MPTEST__VEC_GROW_ONE(T, vec) \
     do { \
-        vec->_size += 1; \
-        if (vec->_size > vec->_alloc) { \
+        void* new_ptr; \
+        mptest_size new_alloc; \
+        if (vec->_size + 1 > vec->_alloc) { \
             if (vec->_data == MPTEST_NULL) { \
-                vec->_alloc = 1; \
-                vec->_data = (T*)MPTEST_MALLOC(sizeof(T) * vec->_alloc); \
-                if (vec->_data == MPTEST_NULL) { \
-                    return -1; \
-                } \
+                new_alloc = 1; \
+                new_ptr = (T*)MPTEST_MALLOC(sizeof(T) * new_alloc); \
             } else { \
-                vec->_alloc *= 2; \
-                vec->_data = (T*)MPTEST_REALLOC(vec->_data, sizeof(T) * vec->_alloc); \
-                if (vec->_data == MPTEST_NULL) { \
-                    return -1; \
-                } \
+                new_alloc = vec->_alloc * 2; \
+                new_ptr = (T*)MPTEST_REALLOC(vec->_data, sizeof(T) * new_alloc); \
             } \
+            if (new_ptr == MPTEST_NULL) { \
+                return -1; \
+            } \
+            vec->_alloc = new_alloc; \
+            vec->_data = new_ptr; \
         } \
+        vec->_size = vec->_size + 1; \
     } while (0)
 
 #define MPTEST__VEC_GROW(T, vec, n) \
     do { \
-        vec->_size += n; \
-        if (vec->_size > vec->_alloc) { \
-            vec->_alloc = vec->_size + (vec->_size >> 1); \
-            if (vec->_data == MPTEST_NULL) { \
-                vec->_data = (T*)MPTEST_MALLOC(sizeof(T) * vec->_alloc); \
-            } else { \
-                vec->_data = (T*)MPTEST_REALLOC(vec->_data, sizeof(T) * vec->_alloc); \
+        void* new_ptr; \
+        mptest_size new_alloc = vec->_alloc; \
+        mptest_size new_size = vec->_size + n; \
+        if (new_size > new_alloc) { \
+            if (new_alloc == 0) { \
+                new_alloc = 1; \
+            } \
+            while (new_alloc < new_size) { \
+                new_alloc *= 2; \
             } \
             if (vec->_data == MPTEST_NULL) { \
+                new_ptr = (T*)MPTEST_MALLOC(sizeof(T) * new_alloc); \
+            } else { \
+                new_ptr = (T*)MPTEST_REALLOC(vec->_data, sizeof(T) * new_alloc); \
+            } \
+            if (new_ptr == MPTEST_NULL) { \
                 return -1; \
             } \
+            vec->_alloc = new_alloc; \
+            vec->_data = new_ptr; \
         } \
+        vec->_size += n; \
     } while (0)
 
 #define MPTEST__VEC_SETSIZE(T, vec, n) \
     do { \
+        void* new_ptr; \
         if (vec->_alloc < n) { \
-            vec->_alloc = n; \
             if (vec->_data == MPTEST_NULL) { \
-                vec->_data = (T*)MPTEST_MALLOC(sizeof(T) * vec->_alloc); \
+                new_ptr = (T*)MPTEST_MALLOC(sizeof(T) * n); \
             } else { \
-                vec->_data = (T*)MPTEST_REALLOC(vec->_data, sizeof(T) * vec->_alloc); \
+                new_ptr = (T*)MPTEST_REALLOC(vec->_data, sizeof(T) * n); \
             } \
-            if (vec->_data == MPTEST_NULL) { \
+            if (new_ptr == MPTEST_NULL) { \
                 return -1; \
             } \
+            vec->_alloc = n; \
+            vec->_data = new_ptr; \
         } \
     } while (0)
 
@@ -1443,15 +1248,233 @@ MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, 
 /* mptest */
 #ifndef MPTEST_INTERNAL_H
 #define MPTEST_INTERNAL_H
+
+/* How assert checking works (and why we need longjmp for it):
+ * 1. You use the function ASSERT_ASSERT(statement) in your test code.
+ * 2. Under the hood, ASSERT_ASSERT setjmps the current test, and runs the
+ *    statement until an assert within the program fails.
+ * 3. The assert hook longjmps out of the code into the previous setjmp from
+ *    step (2).
+ * 4. mptest recognizes this jump back and passes the test.
+ * 5. If the jump back doesn't happen, mptest recognizes this too and fails the
+ *    test, expecting an assertion failure. */
+#if MPTEST_USE_LONGJMP
+    #include <setjmp.h>
+
+/* Enumeration of the reasons a `longjmp()` can happen from within a test.
+ * When running an assertion like `ASSERT_ASSERT()`, we check the returned
+ * jump reason to ensure that an assertion failure happened and not, e.g., a
+ * malloc failure. */
+typedef enum mptest__longjmp_reason
+{
+    MPTEST__LONGJMP_REASON_NONE,
+    /* An assertion failure. */
+    MPTEST__LONGJMP_REASON_ASSERT_FAIL = 1,
+    #if MPTEST_USE_LEAKCHECK
+    /* `malloc()` (the real one) *actually* returned NULL. As in, an actual
+     * error. */
+    MPTEST__LONGJMP_REASON_MALLOC_REALLY_RETURNED_NULL = 2,
+    /* You passed a NULL pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_NULL = 4,
+    /* You passed an invalid pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_INVALID = 8,
+    /* You passed an already-freed pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_FREED = 16,
+    /* You passed an already-reallocated pointer to `realloc()`. */
+    MPTEST__LONGJMP_REASON_REALLOC_OF_REALLOCED = 32,
+    /* You passed a NULL pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_NULL = 64,
+    /* You passed an invalid pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_INVALID = 128,
+    /* You passed an already-freed pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_FREED = 256,
+    /* You passed an already-reallocated pointer to `free()`. */
+    MPTEST__LONGJMP_REASON_FREE_OF_REALLOCED = 512,
+    #endif
+    MPTEST__LONGJMP_REASON_LAST
+} mptest__longjmp_reason;
+#endif
+
+#if MPTEST_USE_TIME
+    #include <time.h>
+#endif
+
+#if MPTEST_USE_APARSE
+    #define MPTEST__APARSE_ARG_COUNT 16
+#endif
+
+#define MPTEST__RESULT_SKIPPED -3
+
+/* The different ways a test can fail. */
+typedef enum mptest__fail_reason
+{
+    MPTEST__FAIL_REASON_ASSERT_FAILURE,
+#if MPTEST_USE_DYN_ALLOC
+    MPTEST__FAIL_REASON_NOMEM,
+#endif
+#if MPTEST_USE_LEAKCHECK
+    MPTEST__FAIL_REASON_LEAKED,
+#endif
+#if MPTEST_USE_SYM
+    MPTEST__FAIL_REASON_SYM_INEQUALITY,
+    MPTEST__FAIL_REASON_SYM_SYNTAX,
+    MPTEST__FAIL_REASON_SYM_DESERIALIZE,
+#endif
+    MPTEST__FAIL_REASON_LAST
+} mptest__fail_reason;
+
+/* Type representing a function to be called whenever a suite is set up or torn
+ * down. */
+typedef void (*mptest__suite_callback)(void* data);
+
+#if MPTEST_USE_SYM
+typedef struct mptest__sym_fail_data {
+    mptest_sym* sym_actual;
+    mptest_sym* sym_expected;
+} mptest__sym_fail_data;
+
+typedef struct mptest__sym_syntax_error_data {
+    const char* err_msg;
+    mptest_size err_pos;
+} mptest__sym_syntax_error_data;
+#endif
+
+/* Data describing how the test failed. */
+typedef union mptest__fail_data {
+    const char* string_data;
+#if MPTEST_USE_LEAKCHECK
+    void* memory_block;
+#endif
+#if MPTEST_USE_SYM
+    mptest__sym_fail_data sym_fail_data;
+    mptest__sym_syntax_error_data sym_syntax_error_data;
+#endif
+} mptest__fail_data;
+
+#if MPTEST_USE_APARSE
+typedef struct mptest__aparse_name mptest__aparse_name;
+
+struct mptest__aparse_name {
+    const char* name;
+    mptest_size name_len;
+    mptest__aparse_name* next;
+};
+
+typedef struct mptest__aparse_state {
+    aparse_state aparse;
+    /*     --leak-check : whether to enable leak checking or not */
+    int opt_leak_check;
+    /*     --oom : whether to enable OOM checking or not */
+    int opt_leak_check_oom;
+    /* -t, --test : the test name(s) to search for and run */
+    mptest__aparse_name* opt_test_name_head;
+    mptest__aparse_name* opt_test_name_tail;
+    /* -s, --suite : the suite name(s) to search for and run */
+    mptest__aparse_name* opt_suite_name_head;
+    mptest__aparse_name* opt_suite_name_tail;
+} mptest__aparse_state;
+#endif
+
+struct mptest__state {
+    /* Total number of assertions */
+    int assertions;
+    /* Total number of tests */
+    int total;
+    /* Total number of passes, fails, and errors */
+    int passes;
+    int fails;
+    int errors;
+    /* Total number of suite passes and fails */
+    int suite_passes;
+    int suite_fails;
+    /* 1 if the current suite failed, 0 if not */
+    int suite_failed;
+    /* Suite setup/teardown callbacks */
+    mptest__suite_callback suite_test_setup_cb;
+    mptest__suite_callback suite_test_teardown_cb;
+    /* Names of the current running test/suite */
+    const char* current_test;
+    const char* current_suite;
+    /* Reason for failing a test */
+    mptest__fail_reason fail_reason;
+    /* Fail diagnostics */
+    const char* fail_msg;
+    const char* fail_file;
+    int         fail_line;
+    /* Stores information about the failure. */
+    /* Assert expression that caused the fail, if `fail_reason` ==
+     * `MPTEST__FAIL_REASON_ASSERT_FAILURE` */
+    /* Pointer to offending allocation, if `longjmp_reason` is one of the
+     * malloc fail reasons */
+    mptest__fail_data fail_data;
+    /* Indentation level (used for output) */
+    int indent_lvl;
+
+#if MPTEST_USE_LONGJMP
+    /* Saved setjmp context (used for testing asserts, etc.) */
+    MPTEST_JMP_BUF longjmp_assert_context;
+    /* Saved setjmp context (used to catch actual errors during testing) */
+    MPTEST_JMP_BUF longjmp_test_context;
+    /* 1 if we are checking for a jump, 0 if not. Used so that if an assertion
+     * *accidentally* goes off, we can catch it. */
+    mptest__longjmp_reason longjmp_checking;
+    /* Reason for jumping (assertion failure, malloc/free failure, etc) */
+    mptest__longjmp_reason longjmp_reason;
+#endif
+
+#if MPTEST_USE_LEAKCHECK
+    /* 1 if current test should be audited for leaks, 0 otherwise. */
+    mptest__leakcheck_mode test_leak_checking;
+    /* First and most recent blocks allocated. */
+    struct mptest__leakcheck_block* first_block;
+    struct mptest__leakcheck_block* top_block;
+    /* Total number of allocations in use. */
+    int total_allocations;
+    /* Total number of calls to malloc() or realloc(). */
+    int total_calls;
+    /* Whether or not the current test failed on an OOM condition */
+    int oom_failed;
+    /* The index of the call that the test failed on */
+    int oom_fail_call;
+#endif
+
+#if MPTEST_USE_TIME
+    /* Start times that will be compared against later */
+    clock_t program_start_time;
+    clock_t suite_start_time;
+    clock_t test_start_time;
+#endif
+
+#if MPTEST_USE_APARSE
+    mptest__aparse_state aparse_state;
+#endif
+
+#if MPTEST_USE_FUZZ
+    /* State of the random number generator */
+    mptest_rand rand_state;
+    /* Whether or not the current test should be fuzzed */
+    int fuzz_active;
+    /* Whether or not the current test failed on a fuzz */
+    int fuzz_failed;
+    /* Number of iterations to run the next test for */
+    int fuzz_iterations;
+    /* Fuzz failure context */
+    int fuzz_fail_iteration;
+    mptest_rand fuzz_fail_seed;
+#endif
+};
+
 #include <stdio.h>
 
-MPTEST_INTERNAL enum mptest__result mptest__state_run_test(struct mptest__state* state, mptest__test_func test_func);
+MPTEST_INTERNAL mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func);
 MPTEST_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
 
 #if MPTEST_USE_LONGJMP
 
 MPTEST_INTERNAL void mptest__longjmp_init(struct mptest__state* state);
 MPTEST_INTERNAL void mptest__longjmp_destroy(struct mptest__state* state);
+MPTEST_INTERNAL void mptest__longjmp_exec(struct mptest__state* state,
+    enum mptest__longjmp_reason reason, const char* file, int line, const char* msg);
 
 #endif
 
@@ -1508,6 +1531,7 @@ MPTEST_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state);
 MPTEST_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state);
 MPTEST_INTERNAL int mptest__leakcheck_block_has_freeable(
     struct mptest__leakcheck_block* block);
+MPTEST_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* state, mptest__test_func test_func);
 #endif
 
 #if MPTEST_USE_COLOR
@@ -1540,7 +1564,7 @@ MPTEST_INTERNAL int mptest__aparse_match_suite_name(struct mptest__state* state,
 
 #if MPTEST_USE_FUZZ
 MPTEST_INTERNAL void mptest__fuzz_init(struct mptest__state* state);
-MPTEST_INTERNAL enum mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func);
+MPTEST_INTERNAL mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func);
 MPTEST_INTERNAL void mptest__fuzz_print(struct mptest__state* state);
 #endif
 
@@ -3407,14 +3431,6 @@ MPTEST_INTERNAL int mptest__aparse_init(struct mptest__state* state)
         return err;
     }
 
-#if MPTEST_USE_LEAKCHECK
-    if ((err = aparse_add_opt(aparse, 0, "leak-check"))) {
-        return err;
-    }
-    aparse_arg_type_bool(aparse, &test_state->opt_leak_check);
-    aparse_arg_help(aparse, "Instrument tests with memory leak checking");
-#endif
-
     if ((err = aparse_add_opt(aparse, 't', "test"))) {
         return err;
     }
@@ -3428,6 +3444,20 @@ MPTEST_INTERNAL int mptest__aparse_init(struct mptest__state* state)
     aparse_arg_type_custom(aparse, mptest__aparse_opt_suite_cb, test_state, 1);
     aparse_arg_help(aparse, "Run suites that match the substring NAME");
     aparse_arg_metavar(aparse, "NAME");
+
+#if MPTEST_USE_LEAKCHECK
+    if ((err = aparse_add_opt(aparse, 0, "leak-check"))) {
+        return err;
+    }
+    aparse_arg_type_bool(aparse, &test_state->opt_leak_check);
+    aparse_arg_help(aparse, "Instrument tests with memory leak checking");
+
+    if ((err = aparse_add_opt(aparse, 0, "oom"))) {
+        return err;
+    }
+    aparse_arg_type_bool(aparse, &test_state->opt_leak_check_oom);
+    aparse_arg_help(aparse, "Simulate out-of-memory errors");
+#endif
 
     if ((err = aparse_add_opt(aparse, 'h', "help"))) {
         return err;
@@ -3471,8 +3501,11 @@ MPTEST_API int mptest__state_init_argv(struct mptest__state* state,
         return stat;
     }
 #if MPTEST_USE_LEAKCHECK
+    if (state->aparse_state.opt_leak_check_oom) {
+        state->test_leak_checking = MPTEST__LEAKCHECK_MODE_OOM_SET;
+    }
     if (state->aparse_state.opt_leak_check) {
-        state->test_leak_checking = 1;
+        state->test_leak_checking = MPTEST__LEAKCHECK_MODE_ON;
     }
 #endif
     return stat;
@@ -3527,10 +3560,15 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state) {
     return (state->rand_state = ((a * state->rand_state + c) % m) & 0xFFFFFFFF);
 }
 
-MPTEST_INTERNAL enum mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func) {
+MPTEST_API void mptest__fuzz_next_test(struct mptest__state* state, int iterations) {
+    state->fuzz_iterations = iterations;
+    state->fuzz_active = 1;
+}
+
+MPTEST_INTERNAL mptest__result mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func) {
     int i = 0;
     int iters = 1;
-    enum mptest__result res = MPTEST__RESULT_PASS;
+    mptest__result res = MPTEST__RESULT_PASS;
     /* Reset fail variables */
     state->fuzz_fail_iteration = 0;
     state->fuzz_fail_seed = 0;
@@ -3541,7 +3579,7 @@ MPTEST_INTERNAL enum mptest__result mptest__fuzz_run_test(struct mptest__state* 
         /* Save the start state */
         mptest_rand start_state = state->rand_state;
         int should_finish = 0;
-        res = mptest__state_run_test(state, test_func);
+        res = mptest__state_do_run_test(state, test_func);
         /* Note: we don't handle MPTEST__RESULT_SKIPPED because it is handled in
          * the calling function. */
         if (res != MPTEST__RESULT_PASS) {
@@ -3657,6 +3695,9 @@ MPTEST_INTERNAL void mptest__leakcheck_init(struct mptest__state* state)
     state->first_block        = NULL;
     state->top_block          = NULL;
     state->total_allocations = 0;
+    state->total_calls = 0;
+    state->oom_failed = 0;
+    state->oom_fail_call = -1;
 }
 
 /* Destroy malloc-checking state. */
@@ -3680,7 +3721,7 @@ MPTEST_INTERNAL void mptest__leakcheck_destroy(struct mptest__state* state)
 MPTEST_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state)
 {
     /* Preserve `test_leak_checking` */
-    int test_leak_checking = state->test_leak_checking;
+    mptest__leakcheck_mode test_leak_checking = state->test_leak_checking;
     mptest__leakcheck_destroy(state);
     mptest__leakcheck_init(state);
     state->test_leak_checking = test_leak_checking;
@@ -3712,6 +3753,19 @@ MPTEST_API void* mptest__leakcheck_hook_malloc(struct mptest__state* state,
     char* out_ptr;
     if (!state->test_leak_checking) {
         return (char*)MPTEST_MALLOC(size);
+    }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
+        if (state->total_calls == state->oom_fail_call) {
+            state->total_calls++;
+            mptest_malloc_null_breakpoint();
+            return NULL;
+        }
+    }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
+        if (state->total_calls == state->oom_fail_call) {
+            mptest_malloc_null_breakpoint();
+            return NULL;
+        }
     }
     /* Allocate the memory the user requested + space for the header */
     base_ptr = (char*)MPTEST_MALLOC(size + MPTEST__LEAKCHECK_HEADER_SIZEOF);
@@ -3755,6 +3809,8 @@ MPTEST_API void* mptest__leakcheck_hook_malloc(struct mptest__state* state,
     out_ptr = base_ptr + MPTEST__LEAKCHECK_HEADER_SIZEOF;
     /* Increment the total number of allocations */
     state->total_allocations++;
+    /* Increment the total number of calls */
+    state->total_calls++;
     return out_ptr;
 }
 
@@ -3814,6 +3870,19 @@ MPTEST_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     char* out_ptr;
     if (!state->test_leak_checking) {
         return (void*)MPTEST_REALLOC(old_ptr, new_size);
+    }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
+        if (state->total_calls == state->oom_fail_call) {
+            state->total_calls++;
+            mptest_malloc_null_breakpoint();
+            return NULL;
+        }
+    }
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
+        if (state->total_calls == state->oom_fail_call) {
+            mptest_malloc_null_breakpoint();
+            return NULL;
+        }
     }
     old_header = (struct mptest__leakcheck_header*)((char*)old_ptr
                                             - MPTEST__LEAKCHECK_HEADER_SIZEOF);
@@ -3880,7 +3949,50 @@ MPTEST_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     old_block_info->realloc_next = new_block_info;
     new_block_info->realloc_prev = old_block_info;
     out_ptr                      = base_ptr + MPTEST__LEAKCHECK_HEADER_SIZEOF;
+    /* Increment the total number of calls */
+    state->total_calls++;
     return out_ptr;
+}
+
+MPTEST_API void mptest__leakcheck_set(struct mptest__state* state, int on) {
+    state->test_leak_checking = on;
+}
+
+MPTEST_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* state, mptest__test_func test_func) {
+    int max_iter = 0;
+    int i;
+    mptest__result res = MPTEST__RESULT_PASS;
+    state->oom_fail_call = -1;
+    state->oom_failed = 0;
+    mptest__leakcheck_reset(state);
+    res = mptest__state_do_run_test(state, test_func);
+    max_iter = state->total_calls;
+    if (res) {
+        /* Initial test failed. */
+        return res;
+    }
+    for (i = 0; i < max_iter; i++) {
+        int should_finish = 0;
+        mptest__leakcheck_reset(state);
+        state->oom_fail_call = i;
+        res = mptest__state_do_run_test(state, test_func);
+        if (res != MPTEST__RESULT_PASS) {
+            should_finish = 1;
+        }
+        if (mptest__leakcheck_has_leaks(state)) {
+            should_finish = 1;
+        }
+        if (should_finish) {
+            /* Save fail context */
+            state->oom_failed = 1;
+            break;
+        }
+    }
+    return res;
+}
+
+MPTEST_API void mptest_malloc_null_breakpoint(void) {
+    return;
 }
 
 #endif
@@ -3904,7 +4016,7 @@ MPTEST_INTERNAL void mptest__longjmp_destroy(struct mptest__state* state)
  * depending on if we wanted `reason` to happen or not. In other words, this
  * will fail the test if we weren't explicitly checking for `reason` to happen,
  * meaning `reason` was unexpected and thus an error. */
-MPTEST_API void mptest__longjmp_exec(struct mptest__state* state,
+MPTEST_INTERNAL void mptest__longjmp_exec(struct mptest__state* state,
     enum mptest__longjmp_reason reason, const char* file, int line, const char* msg)
 {
     state->longjmp_reason = reason;
@@ -4066,7 +4178,7 @@ MPTEST_INTERNAL int mptest__streq(const char* a, const char* b)
 }
 
 /* Ran when setting up for a test before it is run. */
-MPTEST_API enum mptest__result mptest__state_before_test(
+MPTEST_INTERNAL mptest__result mptest__state_before_test(
     struct mptest__state* state, mptest__test_func test_func,
     const char* test_name)
 {
@@ -4086,15 +4198,28 @@ MPTEST_API enum mptest__result mptest__state_before_test(
         return MPTEST__RESULT_SKIPPED;
     }
 #endif
+#if MPTEST_USE_LEAKCHECK 
+    if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OFF
+        || state->test_leak_checking == MPTEST__LEAKCHECK_MODE_ON) {
+#if MPTEST_USE_FUZZ
+        return mptest__fuzz_run_test(state, test_func);
+#else
+        return mptest__state_do_run_test(state, test_func);
+#endif
+    } else {
+        return mptest__leakcheck_oom_run_test(state, test_func);
+    }
+#else
 #if MPTEST_USE_FUZZ
     return mptest__fuzz_run_test(state, test_func);
 #else
-    return mptest__state_run_test(state, test_func);
+    return mptest__state_do_run_test(state, test_func);
+#endif
 #endif
 }
 
-MPTEST_INTERNAL enum mptest__result mptest__state_run_test(struct mptest__state* state, mptest__test_func test_func) {
-    enum mptest__result res;
+MPTEST_INTERNAL mptest__result mptest__state_do_run_test(struct mptest__state* state, mptest__test_func test_func) {
+    mptest__result res;
 #if MPTEST_USE_LONGJMP
     if (MPTEST_SETJMP(state->longjmp_test_context) == 0) {
         res = test_func();
@@ -4108,8 +4233,8 @@ MPTEST_INTERNAL enum mptest__result mptest__state_run_test(struct mptest__state*
 }
 
 /* Ran when a test is over. */
-MPTEST_API void mptest__state_after_test(struct mptest__state* state,
-    enum mptest__result                                         res)
+MPTEST_INTERNAL void mptest__state_after_test(struct mptest__state* state,
+    mptest__result                                         res)
 {
 #if MPTEST_USE_LEAKCHECK
     int has_leaks;
@@ -4277,14 +4402,23 @@ MPTEST_API void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_REALLOC_OF_NULL) {
+        } 
+        else if (state->longjmp_reason
+                 == MPTEST__LONGJMP_REASON_REALLOC_OF_NULL) {
             mptest__state_print_indent(state);
             printf(
                 "  " MPTEST__COLOR_FAIL "attempt to call realloc() on a NULL "
                 "pointer" MPTEST__COLOR_RESET "\n");
             mptest__state_print_indent(state);
-            printf("    ...attempt to reallocate at ");
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason == MPTEST__LONGJMP_REASON_FREE_OF_NULL) {
+            mptest__state_print_indent(state);
+            printf(
+                "  " MPTEST__COLOR_FAIL "attempt to call free() on a NULL "
+                "pointer" MPTEST__COLOR_RESET "\n");
+            mptest__state_print_indent(state);
+            printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
         } else if (state->longjmp_reason
                    == MPTEST__LONGJMP_REASON_REALLOC_OF_INVALID) {
@@ -4296,13 +4430,58 @@ MPTEST_API void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    pointer: %p\n", state->fail_data.memory_block);
             mptest__state_print_indent(state);
-            printf("    ...attempt to reallocate at ");
+            printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
         } else if (state->longjmp_reason
                    == MPTEST__LONGJMP_REASON_REALLOC_OF_FREED) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL
                    "attempt to call realloc() on a pointer that was already "
+                   "freed" MPTEST__COLOR_RESET ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_REALLOC_OF_REALLOCED) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL
+                   "attempt to call realloc() on a pointer that was already "
+                   "reallocated" MPTEST__COLOR_RESET ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_FREE_OF_INVALID) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL "attempt to call free() on an "
+                   "invalid pointer (pointer was not "
+                   "returned by malloc() or free())" MPTEST__COLOR_RESET
+                   ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_FREE_OF_FREED) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL
+                   "attempt to call free() on a pointer that was already "
+                   "freed" MPTEST__COLOR_RESET ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_FREE_OF_FREED) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL
+                   "attempt to call free() on a pointer that was already "
                    "freed" MPTEST__COLOR_RESET ":\n");
             mptest__state_print_indent(state);
             printf("    pointer: %p\n", state->fail_data.memory_block);
@@ -4336,8 +4515,13 @@ MPTEST_API void mptest__state_after_test(struct mptest__state* state,
     }
 }
 
+MPTEST_API void mptest__run_test(struct mptest__state* state, mptest__test_func test_func, const char* test_name) {
+    mptest__result res = mptest__state_before_test(state, test_func, test_name);
+    mptest__state_after_test(state, res);
+}
+
 /* Ran before a suite is executed. */
-MPTEST_API void mptest__state_before_suite(struct mptest__state* state,
+MPTEST_INTERNAL void mptest__state_before_suite(struct mptest__state* state,
     mptest__suite_func suite_func,
     const char*                                                   suite_name)
 {
@@ -4357,7 +4541,7 @@ MPTEST_API void mptest__state_before_suite(struct mptest__state* state,
 }
 
 /* Ran after a suite is executed. */
-MPTEST_API void mptest__state_after_suite(struct mptest__state* state)
+MPTEST_INTERNAL void mptest__state_after_suite(struct mptest__state* state)
 {
     if (!state->suite_failed) {
         state->suite_passes++;
@@ -4369,19 +4553,53 @@ MPTEST_API void mptest__state_after_suite(struct mptest__state* state)
     state->indent_lvl--;
 }
 
-/* Fills state with information on failure. */
-MPTEST_API void mptest__assert_do_failure(const char* msg, const char* assert_expr, const char* file, int line)
-{
-    mptest__state_g.fail_reason = MPTEST__FAIL_REASON_ASSERT_FAILURE;
-    mptest__state_g.fail_msg    = msg;
-    mptest__state_g.fail_data.string_data = assert_expr;
-    mptest__state_g.fail_file   = file;
-    mptest__state_g.fail_line   = line;
+MPTEST_API void mptest__run_suite(struct mptest__state* state, mptest__suite_func suite_func, const char* suite_name) {
+    mptest__state_before_suite(state, suite_func, suite_name);
+    mptest__state_after_suite(state);
 }
 
-/* Dummy function to break on for assert failures */
-MPTEST_API void mptest_assert_fail() {
+/* Fills state with information on pass. */
+MPTEST_API void mptest__assert_pass(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line) {
+    MPTEST__UNUSED(msg);
+    MPTEST__UNUSED(assert_expr);
+    MPTEST__UNUSED(file);
+    MPTEST__UNUSED(line);
+    state->assertions++;
+}
+
+/* Fills state with information on failure. */
+MPTEST_API void mptest__assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line)
+{
+    state->fail_reason = MPTEST__FAIL_REASON_ASSERT_FAILURE;
+    state->fail_msg    = msg;
+    state->fail_data.string_data = assert_expr;
+    state->fail_file   = file;
+    state->fail_line   = line;
+    mptest_assert_fail_breakpoint();
+}
+
+/* Dummy function to break on for test assert failures */
+MPTEST_API void mptest_assert_fail_breakpoint() {
     return;
+}
+
+/* Dummy function to break on for program assert failures */
+MPTEST_API void mptest_uncaught_assert_fail_breakpoint() {
+    return;
+}
+
+MPTEST_API MPTEST_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state) {
+    state->longjmp_checking = MPTEST__LONGJMP_REASON_ASSERT_FAIL;
+    return &state->longjmp_assert_context;
+}
+
+MPTEST_API void mptest__catch_assert_end(struct mptest__state* state) {
+    state->longjmp_checking = 0;
+}
+
+MPTEST_API void mptest__catch_assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line) {
+    state->fail_data.string_data = assert_expr;
+    mptest__longjmp_exec(state, MPTEST__LONGJMP_REASON_ASSERT_FAIL, file, line, msg);
 }
 
 /* mptest */

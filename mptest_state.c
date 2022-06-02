@@ -364,14 +364,23 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_REALLOC_OF_NULL) {
+        } 
+        else if (state->longjmp_reason
+                 == MPTEST__LONGJMP_REASON_REALLOC_OF_NULL) {
             mptest__state_print_indent(state);
             printf(
                 "  " MPTEST__COLOR_FAIL "attempt to call realloc() on a NULL "
                 "pointer" MPTEST__COLOR_RESET "\n");
             mptest__state_print_indent(state);
-            printf("    ...attempt to reallocate at ");
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason == MPTEST__LONGJMP_REASON_FREE_OF_NULL) {
+            mptest__state_print_indent(state);
+            printf(
+                "  " MPTEST__COLOR_FAIL "attempt to call free() on a NULL "
+                "pointer" MPTEST__COLOR_RESET "\n");
+            mptest__state_print_indent(state);
+            printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
         } else if (state->longjmp_reason
                    == MPTEST__LONGJMP_REASON_REALLOC_OF_INVALID) {
@@ -383,13 +392,58 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    pointer: %p\n", state->fail_data.memory_block);
             mptest__state_print_indent(state);
-            printf("    ...attempt to reallocate at ");
+            printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
         } else if (state->longjmp_reason
                    == MPTEST__LONGJMP_REASON_REALLOC_OF_FREED) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL
                    "attempt to call realloc() on a pointer that was already "
+                   "freed" MPTEST__COLOR_RESET ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_REALLOC_OF_REALLOCED) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL
+                   "attempt to call realloc() on a pointer that was already "
+                   "reallocated" MPTEST__COLOR_RESET ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_FREE_OF_INVALID) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL "attempt to call free() on an "
+                   "invalid pointer (pointer was not "
+                   "returned by malloc() or free())" MPTEST__COLOR_RESET
+                   ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_FREE_OF_FREED) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL
+                   "attempt to call free() on a pointer that was already "
+                   "freed" MPTEST__COLOR_RESET ":\n");
+            mptest__state_print_indent(state);
+            printf("    pointer: %p\n", state->fail_data.memory_block);
+            mptest__state_print_indent(state);
+            printf("    ...at ");
+            mptest__print_source_location(state->fail_file, state->fail_line);
+        } else if (state->longjmp_reason
+                   == MPTEST__LONGJMP_REASON_FREE_OF_FREED) {
+            mptest__state_print_indent(state);
+            printf("  " MPTEST__COLOR_FAIL
+                   "attempt to call free() on a pointer that was already "
                    "freed" MPTEST__COLOR_RESET ":\n");
             mptest__state_print_indent(state);
             printf("    pointer: %p\n", state->fail_data.memory_block);
@@ -483,10 +537,16 @@ MN_API void mptest__assert_fail(struct mptest__state* state, const char* msg, co
     state->fail_data.string_data = assert_expr;
     state->fail_file   = file;
     state->fail_line   = line;
+    mptest_assert_fail_breakpoint();
 }
 
-/* Dummy function to break on for assert failures */
+/* Dummy function to break on for test assert failures */
 MN_API void mptest_assert_fail_breakpoint() {
+    return;
+}
+
+/* Dummy function to break on for program assert failures */
+MN_API void mptest_uncaught_assert_fail_breakpoint() {
     return;
 }
 

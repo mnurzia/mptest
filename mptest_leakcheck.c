@@ -141,11 +141,13 @@ MN_API void* mptest__leakcheck_hook_malloc(struct mptest__state* state,
     if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
         if (state->total_calls == state->oom_fail_call) {
             state->total_calls++;
+            mptest_malloc_null_breakpoint();
             return NULL;
         }
     }
     if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
         if (state->total_calls == state->oom_fail_call) {
+            mptest_malloc_null_breakpoint();
             return NULL;
         }
     }
@@ -256,11 +258,13 @@ MN_API void* mptest__leakcheck_hook_realloc(struct mptest__state* state,
     if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
         if (state->total_calls == state->oom_fail_call) {
             state->total_calls++;
+            mptest_malloc_null_breakpoint();
             return NULL;
         }
     }
     if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
         if (state->total_calls == state->oom_fail_call) {
+            mptest_malloc_null_breakpoint();
             return NULL;
         }
     }
@@ -359,11 +363,9 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* 
         if (res != MPTEST__RESULT_PASS) {
             should_finish = 1;
         }
-#if MPTEST_USE_LEAKCHECK
         if (mptest__leakcheck_has_leaks(state)) {
             should_finish = 1;
         }
-#endif
         if (should_finish) {
             /* Save fail context */
             state->oom_failed = 1;
@@ -371,6 +373,10 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(struct mptest__state* 
         }
     }
     return res;
+}
+
+MN_API void mptest_malloc_null_breakpoint(void) {
+    return;
 }
 
 #endif

@@ -471,10 +471,7 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
     /* Reset leak-checking state (IMPORTANT!) */
     mptest__leakcheck_reset(state);
 #endif
-    if (res == MPTEST__RESULT_FAIL || res == MPTEST__RESULT_ERROR ||
-        res == MPTEST__RESULT_PASS || res == MPTEST__RESULT_SKIPPED) {
-        printf("\n");
-    }
+    printf("\n");
 }
 
 MN_API void mptest__run_test(struct mptest__state* state, mptest__test_func test_func, const char* test_name) {

@@ -14,43 +14,6 @@
  * 4. mptest recognizes this jump back and passes the test.
  * 5. If the jump back doesn't happen, mptest recognizes this too and fails the
  *    test, expecting an assertion failure. */
-#if MPTEST_USE_LONGJMP
-    #include <setjmp.h>
-
-/* Enumeration of the reasons a `longjmp()` can happen from within a test.
- * When running an assertion like `ASSERT_ASSERT()`, we check the returned
- * jump reason to ensure that an assertion failure happened and not, e.g., a
- * malloc failure. */
-typedef enum mptest__longjmp_reason
-{
-    MPTEST__LONGJMP_REASON_NONE,
-    /* An assertion failure. */
-    MPTEST__LONGJMP_REASON_ASSERT_FAIL = 1,
-    #if MPTEST_USE_LEAKCHECK
-    /* `malloc()` (the real one) *actually* returned NULL. As in, an actual
-     * error. */
-    MPTEST__LONGJMP_REASON_MALLOC_REALLY_RETURNED_NULL = 2,
-    /* You passed a NULL pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_NULL = 4,
-    /* You passed an invalid pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_INVALID = 8,
-    /* You passed an already-freed pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_FREED = 16,
-    /* You passed an already-reallocated pointer to `realloc()`. */
-    MPTEST__LONGJMP_REASON_REALLOC_OF_REALLOCED = 32,
-    /* You passed a NULL pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_NULL = 64,
-    /* You passed an invalid pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_INVALID = 128,
-    /* You passed an already-freed pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_FREED = 256,
-    /* You passed an already-reallocated pointer to `free()`. */
-    MPTEST__LONGJMP_REASON_FREE_OF_REALLOCED = 512,
-    #endif
-    MPTEST__LONGJMP_REASON_LAST
-} mptest__longjmp_reason;
-#endif
-
 #if MPTEST_USE_TIME
     #include <time.h>
 #endif
@@ -64,11 +27,23 @@ typedef enum mptest__longjmp_reason
 /* The different ways a test can fail. */
 typedef enum mptest__fail_reason
 {
+    MPTEST__FAIL_REASON_NONE,
     MPTEST__FAIL_REASON_ASSERT_FAILURE,
+#if MPTEST_USE_LONGJMP
+    MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT,
+#endif
 #if MPTEST_USE_DYN_ALLOC
     MPTEST__FAIL_REASON_NOMEM,
 #endif
 #if MPTEST_USE_LEAKCHECK
+    MPTEST__FAIL_REASON_REALLOC_OF_NULL,
+    MPTEST__FAIL_REASON_REALLOC_OF_INVALID,
+    MPTEST__FAIL_REASON_REALLOC_OF_FREED,
+    MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED,
+    MPTEST__FAIL_REASON_FREE_OF_NULL,
+    MPTEST__FAIL_REASON_FREE_OF_INVALID,
+    MPTEST__FAIL_REASON_FREE_OF_FREED,
+    MPTEST__FAIL_REASON_FREE_OF_REALLOCED,
     MPTEST__FAIL_REASON_LEAKED,
 #endif
 #if MPTEST_USE_SYM
@@ -173,9 +148,9 @@ struct mptest__state {
     MN_JMP_BUF longjmp_test_context;
     /* 1 if we are checking for a jump, 0 if not. Used so that if an assertion
      * *accidentally* goes off, we can catch it. */
-    mptest__longjmp_reason longjmp_checking;
+    mptest__fail_reason longjmp_checking;
     /* Reason for jumping (assertion failure, malloc/free failure, etc) */
-    mptest__longjmp_reason longjmp_reason;
+    mptest__fail_reason longjmp_reason;
 #endif
 
 #if MPTEST_USE_LEAKCHECK
@@ -230,7 +205,7 @@ MN_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
 MN_INTERNAL void mptest__longjmp_init(struct mptest__state* state);
 MN_INTERNAL void mptest__longjmp_destroy(struct mptest__state* state);
 MN_INTERNAL void mptest__longjmp_exec(struct mptest__state* state,
-    enum mptest__longjmp_reason reason, const char* file, int line, const char* msg);
+    mptest__fail_reason reason, const char* file, int line, const char* msg);
 
 #endif
 

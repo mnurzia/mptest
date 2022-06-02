@@ -55,7 +55,9 @@ TEST(t_leak_realloc_SHOULD_FAIL) {
 
 TEST(t_oom_initial) {
     void* a = MPTEST_INJECT_MALLOC(5);
-    MPTEST_INJECT_FREE(a);
+    if (a) {
+        MPTEST_INJECT_FREE(a);
+    }
     PASS();
 }
 

@@ -338,7 +338,7 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
         }
 #endif
 #if MPTEST_USE_LONGJMP
-        if (state->longjmp_reason == MPTEST__LONGJMP_REASON_ASSERT_FAIL) {
+        if (state->fail_reason == MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL
                    "uncaught assertion failure" MPTEST__COLOR_RESET
@@ -356,8 +356,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__print_source_location(state->fail_file, state->fail_line);
         }
     #if MPTEST_USE_LEAKCHECK
-        else if (state->longjmp_reason
-                 == MPTEST__LONGJMP_REASON_MALLOC_REALLY_RETURNED_NULL) {
+        else if (state->fail_reason
+                 == MPTEST__FAIL_REASON_NOMEM) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL "internal error: malloc() returned "
                    "a null pointer" MPTEST__COLOR_RESET "\n");
@@ -365,8 +365,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
         } 
-        else if (state->longjmp_reason
-                 == MPTEST__LONGJMP_REASON_REALLOC_OF_NULL) {
+        else if (state->fail_reason
+                 == MPTEST__FAIL_REASON_REALLOC_OF_NULL) {
             mptest__state_print_indent(state);
             printf(
                 "  " MPTEST__COLOR_FAIL "attempt to call realloc() on a NULL "
@@ -374,7 +374,7 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason == MPTEST__LONGJMP_REASON_FREE_OF_NULL) {
+        } else if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_NULL) {
             mptest__state_print_indent(state);
             printf(
                 "  " MPTEST__COLOR_FAIL "attempt to call free() on a NULL "
@@ -382,8 +382,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_REALLOC_OF_INVALID) {
+        } else if (state->fail_reason
+                   == MPTEST__FAIL_REASON_REALLOC_OF_INVALID) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL "attempt to call realloc() on an "
                    "invalid pointer (pointer was not "
@@ -394,8 +394,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_REALLOC_OF_FREED) {
+        } else if (state->fail_reason
+                   == MPTEST__FAIL_REASON_REALLOC_OF_FREED) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL
                    "attempt to call realloc() on a pointer that was already "
@@ -405,8 +405,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_REALLOC_OF_REALLOCED) {
+        } else if (state->fail_reason
+                   == MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL
                    "attempt to call realloc() on a pointer that was already "
@@ -416,8 +416,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_FREE_OF_INVALID) {
+        } else if (state->fail_reason
+                   == MPTEST__FAIL_REASON_FREE_OF_INVALID) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL "attempt to call free() on an "
                    "invalid pointer (pointer was not "
@@ -428,8 +428,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_FREE_OF_FREED) {
+        } else if (state->fail_reason
+                   == MPTEST__FAIL_REASON_FREE_OF_FREED) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL
                    "attempt to call free() on a pointer that was already "
@@ -439,8 +439,8 @@ MN_INTERNAL void mptest__state_after_test(struct mptest__state* state,
             mptest__state_print_indent(state);
             printf("    ...at ");
             mptest__print_source_location(state->fail_file, state->fail_line);
-        } else if (state->longjmp_reason
-                   == MPTEST__LONGJMP_REASON_FREE_OF_FREED) {
+        } else if (state->fail_reason
+                   == MPTEST__FAIL_REASON_FREE_OF_FREED) {
             mptest__state_print_indent(state);
             printf("  " MPTEST__COLOR_FAIL
                    "attempt to call free() on a pointer that was already "
@@ -551,7 +551,7 @@ MN_API void mptest_uncaught_assert_fail_breakpoint() {
 }
 
 MN_API MN_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state) {
-    state->longjmp_checking = MPTEST__LONGJMP_REASON_ASSERT_FAIL;
+    state->longjmp_checking = MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT;
     return &state->longjmp_assert_context;
 }
 
@@ -561,5 +561,5 @@ MN_API void mptest__catch_assert_end(struct mptest__state* state) {
 
 MN_API void mptest__catch_assert_fail(struct mptest__state* state, const char* msg, const char* assert_expr, const char* file, int line) {
     state->fail_data.string_data = assert_expr;
-    mptest__longjmp_exec(state, MPTEST__LONGJMP_REASON_ASSERT_FAIL, file, line, msg);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT, file, line, msg);
 }

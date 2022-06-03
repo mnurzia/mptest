@@ -189,7 +189,7 @@ MN_INTERNAL mptest__result mptest__state_do_run_test(
 {
   mptest__result res;
 #if MPTEST_USE_LONGJMP
-  if (MN_SETJMP(state->longjmp_test_context) == 0) {
+  if (MN_SETJMP(state->longjmp_state.test_context) == 0) {
     res = test_func();
   } else {
     res = MPTEST__RESULT_ERROR;
@@ -553,13 +553,13 @@ MN_API void mptest_uncaught_assert_fail_breakpoint() { return; }
 
 MN_API MN_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state)
 {
-  state->longjmp_checking = MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT;
-  return &state->longjmp_assert_context;
+  state->longjmp_state.checking = MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT;
+  return &state->longjmp_state.assert_context;
 }
 
 MN_API void mptest__catch_assert_end(struct mptest__state* state)
 {
-  state->longjmp_checking = 0;
+  state->longjmp_state.checking = 0;
 }
 
 MN_API void mptest__catch_assert_fail(

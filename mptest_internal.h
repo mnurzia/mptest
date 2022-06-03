@@ -17,10 +17,6 @@
 #include <time.h>
 #endif
 
-#if MPTEST_USE_APARSE
-#define MPTEST__APARSE_ARG_COUNT 16
-#endif
-
 #define MPTEST__RESULT_SKIPPED -3
 
 /* The different ways a test can fail. */
@@ -122,6 +118,20 @@ typedef struct mptest__aparse_state {
 } mptest__aparse_state;
 #endif
 
+#if MPTEST_USE_LONGJMP
+typedef struct mptest__longjmp_state {
+  /* Saved setjmp context (used for testing asserts, etc.) */
+  MN_JMP_BUF assert_context;
+  /* Saved setjmp context (used to catch actual errors during testing) */
+  MN_JMP_BUF test_context;
+  /* 1 if we are checking for a jump, 0 if not. Used so that if an assertion
+   * *accidentally* goes off, we can catch it. */
+  mptest__fail_reason checking;
+  /* Reason for jumping (assertion failure, malloc/free failure, etc) */
+  mptest__fail_reason reason;
+} mptest__longjmp_state;
+#endif
+
 struct mptest__state {
   /* Total number of assertions */
   int assertions;
@@ -158,15 +168,7 @@ struct mptest__state {
   int indent_lvl;
 
 #if MPTEST_USE_LONGJMP
-  /* Saved setjmp context (used for testing asserts, etc.) */
-  MN_JMP_BUF longjmp_assert_context;
-  /* Saved setjmp context (used to catch actual errors during testing) */
-  MN_JMP_BUF longjmp_test_context;
-  /* 1 if we are checking for a jump, 0 if not. Used so that if an assertion
-   * *accidentally* goes off, we can catch it. */
-  mptest__fail_reason longjmp_checking;
-  /* Reason for jumping (assertion failure, malloc/free failure, etc) */
-  mptest__fail_reason longjmp_reason;
+  mptest__longjmp_state longjmp_state;
 #endif
 
 #if MPTEST_USE_LEAKCHECK

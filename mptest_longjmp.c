@@ -4,8 +4,8 @@
 /* Initialize longjmp state. */
 MN_INTERNAL void mptest__longjmp_init(struct mptest__state* state)
 {
-  state->longjmp_checking = MPTEST__FAIL_REASON_NONE;
-  state->longjmp_reason = MPTEST__FAIL_REASON_NONE;
+  state->longjmp_state.checking = MPTEST__FAIL_REASON_NONE;
+  state->longjmp_state.reason = MPTEST__FAIL_REASON_NONE;
 }
 
 /* Destroy longjmp state. */
@@ -22,15 +22,15 @@ MN_INTERNAL void mptest__longjmp_exec(
     struct mptest__state* state, mptest__fail_reason reason, const char* file,
     int line, const char* msg)
 {
-  state->longjmp_reason = reason;
-  if (state->longjmp_checking == reason) {
-    MN_LONGJMP(state->longjmp_assert_context, 1);
+  state->longjmp_state.reason = reason;
+  if (state->longjmp_state.checking == reason) {
+    MN_LONGJMP(state->longjmp_state.assert_context, 1);
   } else {
     state->fail_file = file;
     state->fail_line = line;
     state->fail_msg = msg;
     state->fail_reason = reason;
-    MN_LONGJMP(state->longjmp_test_context, 1);
+    MN_LONGJMP(state->longjmp_state.test_context, 1);
   }
 }
 

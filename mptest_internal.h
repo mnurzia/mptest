@@ -25,28 +25,46 @@
 
 /* The different ways a test can fail. */
 typedef enum mptest__fail_reason {
+  /* No failure. */
   MPTEST__FAIL_REASON_NONE,
+  /* ASSERT_XX(...) statement failed. */
   MPTEST__FAIL_REASON_ASSERT_FAILURE,
+  /* FAIL() statement issued. */
+  MPTEST__FAIL_REASON_FAIL_EXPR,
 #if MPTEST_USE_LONGJMP
+  /* Program caused an assert() failure *within its code*. */
   MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT,
 #endif
 #if MPTEST_USE_DYN_ALLOC
+  /* Fatal error: mptest (not the program) ran out of memory. */
   MPTEST__FAIL_REASON_NOMEM,
 #endif
 #if MPTEST_USE_LEAKCHECK
+  /* Program tried to call realloc() on null pointer. */
   MPTEST__FAIL_REASON_REALLOC_OF_NULL,
+  /* Program tried to call realloc() on invalid pointer. */
   MPTEST__FAIL_REASON_REALLOC_OF_INVALID,
+  /* Program tried to call realloc() on an already freed pointer. */
   MPTEST__FAIL_REASON_REALLOC_OF_FREED,
+  /* Program tried to call realloc() on an already reallocated pointer. */
   MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED,
+  /* Program tried to call free() on a null pointer. */
   MPTEST__FAIL_REASON_FREE_OF_NULL,
+  /* Program tried to call free() on an invalid pointer. */
   MPTEST__FAIL_REASON_FREE_OF_INVALID,
+  /* Program tried to call free() on an already freed pointer. */
   MPTEST__FAIL_REASON_FREE_OF_FREED,
+  /* Program tried to call free() on an already reallocated pointer. */
   MPTEST__FAIL_REASON_FREE_OF_REALLOCED,
+  /* End-of-test memory check found unfreed blocks. */
   MPTEST__FAIL_REASON_LEAKED,
 #endif
 #if MPTEST_USE_SYM
+  /* Syms compared unequal. */
   MPTEST__FAIL_REASON_SYM_INEQUALITY,
+  /* Syntax error occurred in a sym. */
   MPTEST__FAIL_REASON_SYM_SYNTAX,
+  /* Couldn't parse a sym into an object. */
   MPTEST__FAIL_REASON_SYM_DESERIALIZE,
 #endif
   MPTEST__FAIL_REASON_LAST

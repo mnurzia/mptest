@@ -1,5 +1,5 @@
-#ifndef MN_API_H
-#define MN_API_H
+#ifndef MPTEST_API_H
+#define MPTEST_API_H
 
 #include "_cpack/api.h"
 

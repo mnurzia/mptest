@@ -278,7 +278,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
 #endif
 #if MPTEST_USE_LEAKCHECK
     else if (state->fail_reason == MPTEST__FAIL_REASON_LEAKED || has_leaks) {
-      struct mptest__leakcheck_block* current = state->leakcheck_state.first_block;
+      struct mptest__leakcheck_block* current =
+          state->leakcheck_state.first_block;
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL
              "memory leak(s) detected" MPTEST__COLOR_RESET ":\n");

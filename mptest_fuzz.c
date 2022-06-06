@@ -19,7 +19,9 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state)
   static const mptest_rand m = ((mptest_rand)1) << 31;
   static const mptest_rand c = 12345;
   mptest__fuzz_state* fuzz_state = &state->fuzz_state;
-  return (fuzz_state->rand_state = ((a * fuzz_state->rand_state + c) % m) & 0xFFFFFFFF);
+  return (
+      fuzz_state->rand_state =
+          ((a * fuzz_state->rand_state + c) % m) & 0xFFFFFFFF);
 }
 
 MN_API void mptest__fuzz_next_test(struct mptest__state* state, int iterations)

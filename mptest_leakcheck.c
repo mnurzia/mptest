@@ -106,7 +106,8 @@ MN_INTERNAL void mptest__leakcheck_destroy(struct mptest__state* state)
 MN_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state)
 {
   /* Preserve `test_leak_checking` */
-  mptest__leakcheck_mode test_leak_checking = state->leakcheck_state.test_leak_checking;
+  mptest__leakcheck_mode test_leak_checking =
+      state->leakcheck_state.test_leak_checking;
   mptest__leakcheck_destroy(state);
   mptest__leakcheck_init(state);
   state->leakcheck_state.test_leak_checking = test_leak_checking;

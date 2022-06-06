@@ -143,10 +143,10 @@ MN_API int mptest__state_init_argv(
   }
 #if MPTEST_USE_LEAKCHECK
   if (state->aparse_state.opt_leak_check_oom) {
-    state->test_leak_checking = MPTEST__LEAKCHECK_MODE_OOM_SET;
+    state->leakcheck_state.test_leak_checking = MPTEST__LEAKCHECK_MODE_OOM_SET;
   }
   if (state->aparse_state.opt_leak_check) {
-    state->test_leak_checking = MPTEST__LEAKCHECK_MODE_ON;
+    state->leakcheck_state.test_leak_checking = MPTEST__LEAKCHECK_MODE_ON;
   }
 #endif
   return stat;

@@ -149,7 +149,7 @@ MN_INTERNAL mptest__result mptest__state_before_test(
 {
   state->current_test = test_name;
 #if MPTEST_USE_LEAKCHECK
-  if (state->test_leak_checking) {
+  if (state->leakcheck_state.test_leak_checking) {
     mptest__leakcheck_reset(state);
   }
 #endif
@@ -165,8 +165,8 @@ MN_INTERNAL mptest__result mptest__state_before_test(
   }
 #endif
 #if MPTEST_USE_LEAKCHECK
-  if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OFF ||
-      state->test_leak_checking == MPTEST__LEAKCHECK_MODE_ON) {
+  if (state->leakcheck_state.test_leak_checking == MPTEST__LEAKCHECK_MODE_OFF ||
+      state->leakcheck_state.test_leak_checking == MPTEST__LEAKCHECK_MODE_ON) {
 #if MPTEST_USE_FUZZ
     return mptest__fuzz_run_test(state, test_func);
 #else
@@ -206,7 +206,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
 {
 #if MPTEST_USE_LEAKCHECK
   int has_leaks;
-  if (state->test_leak_checking == 1) {
+  if (state->leakcheck_state.test_leak_checking == 1) {
     has_leaks = mptest__leakcheck_has_leaks(state);
     if (has_leaks) {
       if (res == MPTEST__RESULT_PASS) {
@@ -278,7 +278,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
 #endif
 #if MPTEST_USE_LEAKCHECK
     else if (state->fail_reason == MPTEST__FAIL_REASON_LEAKED || has_leaks) {
-      struct mptest__leakcheck_block* current = state->first_block;
+      struct mptest__leakcheck_block* current = state->leakcheck_state.first_block;
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL
              "memory leak(s) detected" MPTEST__COLOR_RESET ":\n");

@@ -75,20 +75,21 @@ MN_INTERNAL void mptest__leakcheck_block_link_header(
 /* Initialize malloc-checking state. */
 MN_INTERNAL void mptest__leakcheck_init(struct mptest__state* state)
 {
-  state->test_leak_checking = 0;
-  state->first_block = NULL;
-  state->top_block = NULL;
-  state->total_allocations = 0;
-  state->total_calls = 0;
-  state->oom_failed = 0;
-  state->oom_fail_call = -1;
+  mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  leakcheck_state->test_leak_checking = 0;
+  leakcheck_state->first_block = NULL;
+  leakcheck_state->top_block = NULL;
+  leakcheck_state->total_allocations = 0;
+  leakcheck_state->total_calls = 0;
+  leakcheck_state->oom_failed = 0;
+  leakcheck_state->oom_fail_call = -1;
 }
 
 /* Destroy malloc-checking state. */
 MN_INTERNAL void mptest__leakcheck_destroy(struct mptest__state* state)
 {
   /* Walk the malloc list, destroying everything */
-  struct mptest__leakcheck_block* current = state->first_block;
+  struct mptest__leakcheck_block* current = state->leakcheck_state.first_block;
   while (current) {
     struct mptest__leakcheck_block* prev = current;
     if (mptest__leakcheck_block_has_freeable(current)) {
@@ -105,16 +106,16 @@ MN_INTERNAL void mptest__leakcheck_destroy(struct mptest__state* state)
 MN_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state)
 {
   /* Preserve `test_leak_checking` */
-  mptest__leakcheck_mode test_leak_checking = state->test_leak_checking;
+  mptest__leakcheck_mode test_leak_checking = state->leakcheck_state.test_leak_checking;
   mptest__leakcheck_destroy(state);
   mptest__leakcheck_init(state);
-  state->test_leak_checking = test_leak_checking;
+  state->leakcheck_state.test_leak_checking = test_leak_checking;
 }
 
 /* Check the block record for leaks, returning 1 if there are any. */
 MN_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state)
 {
-  struct mptest__leakcheck_block* current = state->first_block;
+  struct mptest__leakcheck_block* current = state->leakcheck_state.first_block;
   while (current) {
     if (mptest__leakcheck_block_has_freeable(current)) {
       return 1;
@@ -135,18 +136,19 @@ MN_API void* mptest__leakcheck_hook_malloc(
   struct mptest__leakcheck_block* block_info;
   /* Pointer to return to the user */
   char* out_ptr;
-  if (!state->test_leak_checking) {
+  struct mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  if (!leakcheck_state->test_leak_checking) {
     return (char*)MN_MALLOC(size);
   }
-  if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
-    if (state->total_calls == state->oom_fail_call) {
-      state->total_calls++;
+  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
+    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
+      leakcheck_state->total_calls++;
       mptest_malloc_null_breakpoint();
       return NULL;
     }
   }
-  if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
-    if (state->total_calls == state->oom_fail_call) {
+  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
+    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
       mptest_malloc_null_breakpoint();
       return NULL;
     }
@@ -168,31 +170,31 @@ MN_API void* mptest__leakcheck_hook_malloc(
   header = (struct mptest__leakcheck_header*)base_ptr;
   mptest__leakcheck_header_set_guard(header);
   /* Setup the block_info */
-  if (state->first_block == NULL) {
+  if (leakcheck_state->first_block == NULL) {
     /* If `state->first_block == NULL`, then this is the first allocation.
      * Use NULL as the previous value, and then set the `first_block` and
      * `top_block` to the new block. */
     mptest__leakcheck_block_init(
         block_info, size, NULL, MPTEST__LEAKCHECK_BLOCK_FLAG_INITIAL, file,
         line);
-    state->first_block = block_info;
-    state->top_block = block_info;
+    leakcheck_state->first_block = block_info;
+    leakcheck_state->top_block = block_info;
   } else {
     /* If this isn't the first allocation, use `state->top_block` as the
      * previous block. */
     mptest__leakcheck_block_init(
-        block_info, size, state->top_block,
+        block_info, size, leakcheck_state->top_block,
         MPTEST__LEAKCHECK_BLOCK_FLAG_INITIAL, file, line);
-    state->top_block = block_info;
+    leakcheck_state->top_block = block_info;
   }
   /* Link the header and block_info together */
   mptest__leakcheck_block_link_header(block_info, header);
   /* Return the base pointer offset by the header amount */
   out_ptr = base_ptr + MPTEST__LEAKCHECK_HEADER_SIZEOF;
   /* Increment the total number of allocations */
-  state->total_allocations++;
+  leakcheck_state->total_allocations++;
   /* Increment the total number of calls */
-  state->total_calls++;
+  leakcheck_state->total_calls++;
   return out_ptr;
 }
 
@@ -201,7 +203,8 @@ MN_API void mptest__leakcheck_hook_free(
 {
   struct mptest__leakcheck_header* header;
   struct mptest__leakcheck_block* block_info;
-  if (!state->test_leak_checking) {
+  struct mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  if (!leakcheck_state->test_leak_checking) {
     MN_FREE(ptr);
     return;
   }
@@ -236,7 +239,7 @@ MN_API void mptest__leakcheck_hook_free(
   MN_FREE(header);
   block_info->flags |= MPTEST__LEAKCHECK_BLOCK_FLAG_FREED;
   /* Decrement the total number of allocations */
-  state->total_allocations--;
+  leakcheck_state->total_allocations--;
 }
 
 MN_API void* mptest__leakcheck_hook_realloc(
@@ -251,18 +254,19 @@ MN_API void* mptest__leakcheck_hook_realloc(
   struct mptest__leakcheck_block* new_block_info;
   /* Pointer to return to the user */
   char* out_ptr;
-  if (!state->test_leak_checking) {
+  struct mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  if (!leakcheck_state->test_leak_checking) {
     return (void*)MN_REALLOC(old_ptr, new_size);
   }
-  if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
-    if (state->total_calls == state->oom_fail_call) {
-      state->total_calls++;
+  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
+    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
+      leakcheck_state->total_calls++;
       mptest_malloc_null_breakpoint();
       return NULL;
     }
   }
-  if (state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
-    if (state->total_calls == state->oom_fail_call) {
+  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
+    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
       mptest_malloc_null_breakpoint();
       return NULL;
     }
@@ -310,17 +314,17 @@ MN_API void* mptest__leakcheck_hook_realloc(
   /* Set the guard again (double bag it per se) */
   mptest__leakcheck_header_set_guard(new_header);
   /* Setup the block_info */
-  if (state->first_block == NULL) {
+  if (leakcheck_state->first_block == NULL) {
     mptest__leakcheck_block_init(
         new_block_info, new_size, NULL,
         MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_NEW, file, line);
-    state->first_block = new_block_info;
-    state->top_block = new_block_info;
+    leakcheck_state->first_block = new_block_info;
+    leakcheck_state->top_block = new_block_info;
   } else {
     mptest__leakcheck_block_init(
-        new_block_info, new_size, state->top_block,
+        new_block_info, new_size, leakcheck_state->top_block,
         MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_NEW, file, line);
-    state->top_block = new_block_info;
+    leakcheck_state->top_block = new_block_info;
   }
   /* Mark `old_block_info` as reallocation target */
   old_block_info->flags |= MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_OLD;
@@ -331,13 +335,13 @@ MN_API void* mptest__leakcheck_hook_realloc(
   new_block_info->realloc_prev = old_block_info;
   out_ptr = base_ptr + MPTEST__LEAKCHECK_HEADER_SIZEOF;
   /* Increment the total number of calls */
-  state->total_calls++;
+  leakcheck_state->total_calls++;
   return out_ptr;
 }
 
 MN_API void mptest__leakcheck_set(struct mptest__state* state, int on)
 {
-  state->test_leak_checking = on;
+  state->leakcheck_state.test_leak_checking = on;
 }
 
 MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
@@ -346,11 +350,12 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
   int max_iter = 0;
   int i;
   mptest__result res = MPTEST__RESULT_PASS;
-  state->oom_fail_call = -1;
-  state->oom_failed = 0;
+  struct mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  leakcheck_state->oom_fail_call = -1;
+  leakcheck_state->oom_failed = 0;
   mptest__leakcheck_reset(state);
   res = mptest__state_do_run_test(state, test_func);
-  max_iter = state->total_calls;
+  max_iter = leakcheck_state->total_calls;
   if (res) {
     /* Initial test failed. */
     return res;
@@ -358,7 +363,7 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
   for (i = 0; i < max_iter; i++) {
     int should_finish = 0;
     mptest__leakcheck_reset(state);
-    state->oom_fail_call = i;
+    leakcheck_state->oom_fail_call = i;
     res = mptest__state_do_run_test(state, test_func);
     if (res != MPTEST__RESULT_PASS) {
       should_finish = 1;
@@ -368,7 +373,7 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
     }
     if (should_finish) {
       /* Save fail context */
-      state->oom_failed = 1;
+      leakcheck_state->oom_failed = 1;
       break;
     }
   }

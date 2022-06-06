@@ -132,6 +132,24 @@ typedef struct mptest__longjmp_state {
 } mptest__longjmp_state;
 #endif
 
+#if MPTEST_USE_LEAKCHECK
+typedef struct mptest__leakcheck_state {
+  /* 1 if current test should be audited for leaks, 0 otherwise. */
+  mptest__leakcheck_mode test_leak_checking;
+  /* First and most recent blocks allocated. */
+  struct mptest__leakcheck_block* first_block;
+  struct mptest__leakcheck_block* top_block;
+  /* Total number of allocations in use. */
+  int total_allocations;
+  /* Total number of calls to malloc() or realloc(). */
+  int total_calls;
+  /* Whether or not the current test failed on an OOM condition */
+  int oom_failed;
+  /* The index of the call that the test failed on */
+  int oom_fail_call;
+} mptest__leakcheck_state;
+#endif
+
 struct mptest__state {
   /* Total number of assertions */
   int assertions;
@@ -172,19 +190,7 @@ struct mptest__state {
 #endif
 
 #if MPTEST_USE_LEAKCHECK
-  /* 1 if current test should be audited for leaks, 0 otherwise. */
-  mptest__leakcheck_mode test_leak_checking;
-  /* First and most recent blocks allocated. */
-  struct mptest__leakcheck_block* first_block;
-  struct mptest__leakcheck_block* top_block;
-  /* Total number of allocations in use. */
-  int total_allocations;
-  /* Total number of calls to malloc() or realloc(). */
-  int total_calls;
-  /* Whether or not the current test failed on an OOM condition */
-  int oom_failed;
-  /* The index of the call that the test failed on */
-  int oom_fail_call;
+  mptest__leakcheck_state leakcheck_state;
 #endif
 
 #if MPTEST_USE_TIME

@@ -150,6 +150,15 @@ typedef struct mptest__leakcheck_state {
 } mptest__leakcheck_state;
 #endif
 
+#if MPTEST_USE_TIME
+typedef struct mptest__time_state {
+  /* Start times that will be compared against later */
+  clock_t program_start_time;
+  clock_t suite_start_time;
+  clock_t test_start_time;
+} mptest__time_state;
+#endif
+
 struct mptest__state {
   /* Total number of assertions */
   int assertions;
@@ -194,10 +203,7 @@ struct mptest__state {
 #endif
 
 #if MPTEST_USE_TIME
-  /* Start times that will be compared against later */
-  clock_t program_start_time;
-  clock_t suite_start_time;
-  clock_t test_start_time;
+  mptest__time_state time_state;
 #endif
 
 #if MPTEST_USE_APARSE

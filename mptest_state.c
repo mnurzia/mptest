@@ -95,7 +95,7 @@ MN_API void mptest__state_report(struct mptest__state* state)
   {
     clock_t program_end_time = clock();
     double elapsed_time =
-        ((double)(program_end_time - state->program_start_time)) /
+        ((double)(program_end_time - state->time_state.program_start_time)) /
         CLOCKS_PER_SEC;
     printf(" in %f seconds", elapsed_time);
   }

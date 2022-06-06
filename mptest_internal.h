@@ -159,6 +159,22 @@ typedef struct mptest__time_state {
 } mptest__time_state;
 #endif
 
+#if MPTEST_USE_FUZZ
+typedef struct mptest__fuzz_state {
+  /* State of the random number generator */
+  mptest_rand rand_state;
+  /* Whether or not the current test should be fuzzed */
+  int fuzz_active;
+  /* Whether or not the current test failed on a fuzz */
+  int fuzz_failed;
+  /* Number of iterations to run the next test for */
+  int fuzz_iterations;
+  /* Fuzz failure context */
+  int fuzz_fail_iteration;
+  mptest_rand fuzz_fail_seed;
+} mptest__fuzz_state;
+#endif
+
 struct mptest__state {
   /* Total number of assertions */
   int assertions;
@@ -211,17 +227,7 @@ struct mptest__state {
 #endif
 
 #if MPTEST_USE_FUZZ
-  /* State of the random number generator */
-  mptest_rand rand_state;
-  /* Whether or not the current test should be fuzzed */
-  int fuzz_active;
-  /* Whether or not the current test failed on a fuzz */
-  int fuzz_failed;
-  /* Number of iterations to run the next test for */
-  int fuzz_iterations;
-  /* Fuzz failure context */
-  int fuzz_fail_iteration;
-  mptest_rand fuzz_fail_seed;
+  mptest__fuzz_state fuzz_state;
 #endif
 };
 

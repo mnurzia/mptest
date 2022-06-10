@@ -60,6 +60,8 @@ TEST(t_oom_initial)
   PASS();
 }
 
+TEST(t_fail_SHOULD_FAIL) { FAIL(); }
+
 int main(int argc, const char* const* argv)
 {
   MPTEST_MAIN_BEGIN_ARGS(argc, argv);
@@ -75,6 +77,7 @@ int main(int argc, const char* const* argv)
   MPTEST_DISABLE_LEAK_CHECKING();
   MPTEST_ENABLE_OOM_ONE();
   RUN_TEST(t_oom_initial);
+  RUN_TEST(t_fail_SHOULD_FAIL);
   MPTEST_DISABLE_LEAK_CHECKING();
   MPTEST_MAIN_END();
   return 0;

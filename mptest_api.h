@@ -172,6 +172,12 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
     }                                                                          \
   } while (0)
 
+/* Unconditionally fail a test. */
+#define FAIL()                                                                 \
+  do {                                                                         \
+    _ASSERT_FAIL_BEHAVIOR("0", "FAIL() called");                               \
+  } while (0)
+
 #define ASSERT(expr) ASSERTm(expr, #expr)
 
 #define ASSERT_EQm(lhs, rhs, msg) _ASSERT_BINOPm(lhs, rhs, ==, msg)

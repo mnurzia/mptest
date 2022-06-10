@@ -107,7 +107,7 @@ typedef struct mptest__aparse_state {
   aparse_state aparse;
   /*     --leak-check : whether to enable leak checking or not */
   int opt_leak_check;
-  /*     --oom : whether to enable OOM checking or not */
+  /*     --leak-check-oom : whether to enable OOM checking or not */
   int opt_leak_check_oom;
   /* -t, --test : the test name(s) to search for and run */
   mptest__aparse_name* opt_test_name_head;
@@ -115,6 +115,8 @@ typedef struct mptest__aparse_state {
   /* -s, --suite : the suite name(s) to search for and run */
   mptest__aparse_name* opt_suite_name_head;
   mptest__aparse_name* opt_suite_name_tail;
+  /*     --leak-check-pass : whether to enable leak check malloc passthrough */
+  int opt_leak_check_pass;
 } mptest__aparse_state;
 #endif
 
@@ -147,6 +149,8 @@ typedef struct mptest__leakcheck_state {
   int oom_failed;
   /* The index of the call that the test failed on */
   int oom_fail_call;
+  /* Whether or not to let allocations fall through */
+  int fall_through;
 } mptest__leakcheck_state;
 #endif
 

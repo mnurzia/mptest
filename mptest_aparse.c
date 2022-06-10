@@ -93,11 +93,18 @@ MN_INTERNAL int mptest__aparse_init(struct mptest__state* state)
   aparse_arg_type_bool(aparse, &test_state->opt_leak_check);
   aparse_arg_help(aparse, "Instrument tests with memory leak checking");
 
-  if ((err = aparse_add_opt(aparse, 0, "oom"))) {
+  if ((err = aparse_add_opt(aparse, 0, "leak-check-oom"))) {
     return err;
   }
   aparse_arg_type_bool(aparse, &test_state->opt_leak_check_oom);
   aparse_arg_help(aparse, "Simulate out-of-memory errors");
+
+  if ((err = aparse_add_opt(aparse, 0, "leak-check-pass"))) {
+    return err;
+  }
+  aparse_arg_type_bool(aparse, &test_state->opt_leak_check_pass);
+  aparse_arg_help(
+      aparse, "Pass memory allocations without recording, useful with ASAN");
 #endif
 
   if ((err = aparse_add_opt(aparse, 'h', "help"))) {
@@ -147,6 +154,9 @@ MN_API int mptest__state_init_argv(
   }
   if (state->aparse_state.opt_leak_check) {
     state->leakcheck_state.test_leak_checking = MPTEST__LEAKCHECK_MODE_ON;
+  }
+  if (state->aparse_state.opt_leak_check_pass) {
+    state->leakcheck_state.fall_through = 1;
   }
 #endif
   return stat;

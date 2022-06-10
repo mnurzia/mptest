@@ -67,6 +67,7 @@ MN_API void* mptest__leakcheck_hook_realloc(
     size_t new_size);
 MN_API void mptest__leakcheck_set(struct mptest__state* state, int on);
 MN_API void mptest_malloc_null_breakpoint(void);
+MN_API void mptest_oom_breakpoint(void);
 #endif
 
 #if MPTEST_USE_APARSE

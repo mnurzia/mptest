@@ -543,14 +543,14 @@ MN_API void mptest__assert_fail(
   state->fail_data.string_data = assert_expr;
   state->fail_file = file;
   state->fail_line = line;
-  mptest_assert_fail_breakpoint();
+  mptest_ex_assert_fail();
 }
 
 /* Dummy function to break on for test assert failures */
-MN_API void mptest_assert_fail_breakpoint() { return; }
+MN_API void mptest_ex_assert_fail() { mptest_ex(); }
 
 /* Dummy function to break on for program assert failures */
-MN_API void mptest_uncaught_assert_fail_breakpoint() { return; }
+MN_API void mptest_ex_uncaught_assert_fail() { mptest_ex(); }
 
 MN_API MN_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state)
 {
@@ -571,3 +571,5 @@ MN_API void mptest__catch_assert_fail(
   mptest__longjmp_exec(
       state, MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT, file, line, msg);
 }
+
+MN_API void mptest_ex() { return; }

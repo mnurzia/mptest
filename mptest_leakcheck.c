@@ -148,13 +148,13 @@ MN_API void* mptest__leakcheck_hook_malloc(
   if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
     if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
       leakcheck_state->total_calls++;
-      mptest_malloc_null_breakpoint();
+      mptest_ex_oom_inject();
       return NULL;
     }
   }
   if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
     if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
-      mptest_malloc_null_breakpoint();
+      mptest_ex_oom_inject();
       return NULL;
     }
   }
@@ -166,7 +166,7 @@ MN_API void* mptest__leakcheck_hook_malloc(
   base_ptr = (char*)MN_MALLOC(size + MPTEST__LEAKCHECK_HEADER_SIZEOF);
   if (base_ptr == NULL) {
     state->fail_data.memory_block = NULL;
-    mptest_oom_breakpoint();
+    mptest_ex_nomem();
     mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NOMEM, file, line, NULL);
   }
   /* Allocate memory for the block_info structure */
@@ -174,7 +174,7 @@ MN_API void* mptest__leakcheck_hook_malloc(
       sizeof(struct mptest__leakcheck_block));
   if (block_info == NULL) {
     state->fail_data.memory_block = NULL;
-    mptest_oom_breakpoint();
+    mptest_ex_nomem();
     mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NOMEM, file, line, NULL);
   }
   /* Setup the header */
@@ -221,6 +221,7 @@ MN_API void mptest__leakcheck_hook_free(
   }
   if (ptr == NULL) {
     state->fail_data.memory_block = NULL;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_FREE_OF_NULL, file, line, NULL);
   }
@@ -231,6 +232,7 @@ MN_API void mptest__leakcheck_hook_free(
   /* TODO: check for SIGSEGV here */
   if (!mptest__leakcheck_header_check_guard(header)) {
     state->fail_data.memory_block = ptr;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_FREE_OF_INVALID, file, line, NULL);
   }
@@ -238,11 +240,13 @@ MN_API void mptest__leakcheck_hook_free(
   /* Ensure that the pointer has not been freed or reallocated already */
   if (block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_FREED) {
     state->fail_data.memory_block = ptr;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_REALLOC_OF_FREED, file, line, NULL);
   }
   if (block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_OLD) {
     state->fail_data.memory_block = ptr;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_FREE_OF_REALLOCED, file, line, NULL);
   }
@@ -272,13 +276,13 @@ MN_API void* mptest__leakcheck_hook_realloc(
   if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
     if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
       leakcheck_state->total_calls++;
-      mptest_malloc_null_breakpoint();
+      mptest_ex_oom_inject();
       return NULL;
     }
   }
   if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
     if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
-      mptest_malloc_null_breakpoint();
+      mptest_ex_oom_inject();
       return NULL;
     }
   }
@@ -292,21 +296,25 @@ MN_API void* mptest__leakcheck_hook_realloc(
   old_block_info = old_header->block;
   if (old_ptr == NULL) {
     state->fail_data.memory_block = NULL;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_REALLOC_OF_NULL, file, line, NULL);
   }
   if (!mptest__leakcheck_header_check_guard(old_header)) {
     state->fail_data.memory_block = old_ptr;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_REALLOC_OF_INVALID, file, line, NULL);
   }
   if (old_block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_FREED) {
     state->fail_data.memory_block = old_ptr;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_REALLOC_OF_FREED, file, line, NULL);
   }
   if (old_block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_OLD) {
     state->fail_data.memory_block = old_ptr;
+    mptest_ex_bad_alloc();
     mptest__longjmp_exec(
         state, MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED, file, line, NULL);
   }
@@ -315,7 +323,7 @@ MN_API void* mptest__leakcheck_hook_realloc(
       (char*)MN_REALLOC(old_header, new_size + MPTEST__LEAKCHECK_HEADER_SIZEOF);
   if (base_ptr == NULL) {
     state->fail_data.memory_block = old_ptr;
-    mptest_oom_breakpoint();
+    mptest_ex_nomem();
     mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NOMEM, file, line, NULL);
   }
   /* Allocate memory for the new block_info structure */
@@ -323,7 +331,7 @@ MN_API void* mptest__leakcheck_hook_realloc(
       sizeof(struct mptest__leakcheck_block));
   if (new_block_info == NULL) {
     state->fail_data.memory_block = old_ptr;
-    mptest_oom_breakpoint();
+    mptest_ex_nomem();
     mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NOMEM, file, line, NULL);
   }
   /* Setup the header */
@@ -397,8 +405,8 @@ MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
   return res;
 }
 
-MN_API void mptest_malloc_null_breakpoint(void) { return; }
-
-MN_API void mptest_oom_breakpoint(void) { return; }
+MN_API void mptest_ex_nomem(void) { mptest_ex(); }
+MN_API void mptest_ex_oom_inject(void) { mptest_ex(); }
+MN_API void mptest_ex_bad_alloc(void) { mptest_ex(); }
 
 #endif

@@ -1,4 +1,4 @@
-#include "../mptest_api.h"
+#include "../mptest_internal.h"
 
 TEST(t_pass) { PASS(); }
 
@@ -62,6 +62,80 @@ TEST(t_oom_initial)
 
 TEST(t_fail_SHOULD_FAIL) { FAIL(); }
 
+int int_from_sym(sym_walk* walk, int* out)
+{
+  int err = 0;
+  if ((err = mptest_sym_walk_getnum(walk, out))) {
+    return err;
+  }
+  return err;
+}
+
+int mn__str_from_sym(sym_walk* walk, mn__str* out)
+{
+  int err = 0;
+  const char* str;
+  mn_size str_size;
+  if ((err = mptest_sym_walk_getstr(walk, &str, &str_size))) {
+    return err;
+  }
+  return mn__str_init_n(out, str, str_size);
+}
+
+TEST(t_sym_num)
+{
+  int num = 0;
+  SYM(int, "1", &num);
+  ASSERT(num == 1);
+  PASS();
+}
+
+TEST(t_sym_atom_s)
+{
+  mn__str s;
+  mn__str_view a, b;
+  SYM(mn__str, "blah", &s);
+  mn__str_view_init(&a, &s);
+  mn__str_view_init_s(&b, "blah");
+  ASSERT_EQ(mn__str_view_cmp(&a, &b), 0);
+  mn__str_destroy(&s);
+  PASS();
+}
+
+typedef struct sym_pair {
+  mn__str a;
+  mn__str b;
+} sym_pair;
+
+int sym_pair_from_sym(sym_walk* walk, sym_pair* out)
+{
+  sym_walk w;
+  const char* str;
+  mn_size str_size;
+  SYM_GET_EXPR(walk, &w);
+  SYM_GET_STR(&w, &str, &str_size);
+  mn__str_init_n(&out->a, str, str_size);
+  SYM_GET_STR(&w, &str, &str_size);
+  mn__str_init_n(&out->b, str, str_size);
+  return 0;
+}
+
+TEST(t_sym_expr)
+{
+  sym_pair pair;
+  mn__str_view a, b;
+  SYM(sym_pair, "(test blah)", &pair);
+  mn__str_view_init(&a, &pair.a);
+  mn__str_view_init_s(&b, "test");
+  ASSERT_EQ(mn__str_view_cmp(&a, &b), 0);
+  mn__str_view_init(&a, &pair.b);
+  mn__str_view_init_s(&b, "blah");
+  ASSERT_EQ(mn__str_view_cmp(&a, &b), 0);
+  mn__str_destroy(&pair.a);
+  mn__str_destroy(&pair.b);
+  PASS();
+}
+
 int main(int argc, const char* const* argv)
 {
   MPTEST_MAIN_BEGIN_ARGS(argc, argv);
@@ -79,6 +153,9 @@ int main(int argc, const char* const* argv)
   RUN_TEST(t_oom_initial);
   RUN_TEST(t_fail_SHOULD_FAIL);
   MPTEST_DISABLE_LEAK_CHECKING();
+  RUN_TEST(t_sym_num);
+  RUN_TEST(t_sym_atom_s);
+  RUN_TEST(t_sym_expr);
   MPTEST_MAIN_END();
   return 0;
 }

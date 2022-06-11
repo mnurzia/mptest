@@ -1,14 +1,6 @@
 #if !defined(MN__MPTEST_CONFIG_H)
 #define MN__MPTEST_CONFIG_H
 
-/* desc */
-/* cppreference */
-#if !defined(MN_ASSERT)
-#include <assert.h>
-#define MN_ASSERT assert
-#endif
-
-/* bits/hooks/longjmp */
 /* Set to 1 in order to define setjmp(), longjmp(), and jmp_buf replacements. */
 #if !defined(MN_USE_CUSTOM_LONGJMP)
 #include <setjmp.h>
@@ -38,6 +30,14 @@
 /* Set to 1 in order to override the setting of the NDEBUG variable. */
 #if !defined(MN_DEBUG)
 #define MN_DEBUG 0
+#endif
+
+/* bits/hooks/assert */
+/* desc */
+/* cppreference */
+#if !defined(MN_ASSERT)
+#include <assert.h>
+#define MN_ASSERT assert
 #endif
 
 /* bits/util/exports */

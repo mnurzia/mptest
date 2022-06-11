@@ -347,6 +347,9 @@ MN_INTERNAL void mptest__fuzz_print(struct mptest__state* state);
 #if MPTEST_USE_SYM
 MN_INTERNAL void
 mptest__sym_dump(mptest_sym* sym, mn_int32 parent_ref, mn_int32 indent);
+MN_INTERNAL int mptest__sym_parse_do(
+    mptest_sym_build* build_in, const mn__str_view in, const char** err_msg,
+    mn_size* err_pos);
 #endif
 
 #endif

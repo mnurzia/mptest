@@ -4,34 +4,51 @@
         "bits/util/exports",
         "bits/util/cstd",
         {
-            "name": "bits/hooks/malloc", 
-            "flags": ["MPTEST_USE_DYN_ALLOC"]
+            "name": "bits/hooks/malloc",
+            "flags": [
+                "MPTEST_USE_DYN_ALLOC"
+            ]
         },
-        "bits/hooks/longjmp", 
-        "bits/hooks/assert", 
+        "bits/hooks/longjmp",
+        "bits/hooks/assert",
         {
             "name": "bits/container/str",
-            "flags": ["MPTEST_USE_DYN_ALLOC", "MPTEST_USE_SYM"]
+            "flags": [
+                "MPTEST_USE_DYN_ALLOC",
+                "MPTEST_USE_SYM"
+            ]
         },
         {
             "name": "bits/container/str_view",
-            "flags": ["MPTEST_USE_DYN_ALLOC", "MPTEST_USE_SYM"]
+            "flags": [
+                "MPTEST_USE_DYN_ALLOC",
+                "MPTEST_USE_SYM"
+            ]
         },
         {
             "name": "bits/container/vec",
-            "flags": ["MPTEST_USE_DYN_ALLOC", "MPTEST_USE_SYM"]
+            "flags": [
+                "MPTEST_USE_DYN_ALLOC",
+                "MPTEST_USE_SYM"
+            ]
         },
         {
             "name": "bits/types/fixed/int32",
-            "flags": ["MPTEST_USE_SYM"]
+            "flags": [
+                "MPTEST_USE_SYM"
+            ]
         },
         {
             "name": "aparse",
-            "flags": ["MPTEST_USE_APARSE"]
+            "flags": [
+                "MPTEST_USE_APARSE"
+            ]
         },
         {
             "name": "bits/util/ntstr/cmp_n",
-            "flags": ["MPTEST_USE_APARSE"]
+            "flags": [
+                "MPTEST_USE_APARSE"
+            ]
         }
     ],
     "files": {
@@ -89,7 +106,10 @@
                 "checking facilities. MPTEST_USE_LONGJMP must be set."
             ],
             "default": "1",
-            "requires": ["MPTEST_USE_LONGJMP", "MPTEST_USE_DYN_ALLOC"]
+            "requires": [
+                "MPTEST_USE_LONGJMP",
+                "MPTEST_USE_DYN_ALLOC"
+            ]
         },
         "MPTEST_USE_COLOR": {
             "type": "flag",

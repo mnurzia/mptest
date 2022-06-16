@@ -136,6 +136,43 @@ TEST(t_sym_expr)
   PASS();
 }
 
+TEST(t_sym_char)
+{
+  int num = 0;
+  SYM(int, "'a'", &num);
+  ASSERT(num == 'a');
+  PASS();
+}
+
+TEST(t_sym_hex)
+{
+  int num = 0;
+  SYM(int, "0x10FFFF", &num);
+  ASSERT(num == 0x10FFFF);
+  PASS();
+}
+
+TEST(t_sym_zero)
+{
+  int num = 1;
+  SYM(int, "0", &num);
+  ASSERT(num == 0);
+  PASS();
+}
+
+TEST(t_sym_unmatched_SHOULD_FAIL)
+{
+  int num = 1;
+  SYM(int, "(0", &num);
+  PASS();
+}
+
+TEST(t_fuzz_error_SHOULD_FAIL)
+{
+  ASSERT_GTE(RAND_PARAM(1000), 5);
+  PASS();
+}
+
 int main(int argc, const char* const* argv)
 {
   MPTEST_MAIN_BEGIN_ARGS(argc, argv);
@@ -156,6 +193,11 @@ int main(int argc, const char* const* argv)
   RUN_TEST(t_sym_num);
   RUN_TEST(t_sym_atom_s);
   RUN_TEST(t_sym_expr);
+  RUN_TEST(t_sym_char);
+  RUN_TEST(t_sym_hex);
+  RUN_TEST(t_sym_zero);
+  RUN_TEST(t_sym_unmatched_SHOULD_FAIL);
+  FUZZ_TEST(t_fuzz_error_SHOULD_FAIL);
   MPTEST_MAIN_END();
   return 0;
 }

@@ -699,7 +699,7 @@ MPTEST_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
     mptest_sym_build temp_build;                                               \
     mptest_sym_walk temp_walk;                                                 \
     if (mptest__sym_make_init(                                                 \
-            &temp_build, &temp_walk, str, __FILE__, __LINE__, MPTEST_NULL)) {  \
+            &temp_build, &temp_walk, str, __FILE__, __LINE__, MPTEST_NULL)) {      \
       return MPTEST__RESULT_ERROR;                                             \
     }                                                                          \
     if (type##_from_sym(&temp_walk, out_var)) {                                \
@@ -787,7 +787,7 @@ MPTEST_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
 /* bits/container/str */
 typedef struct mptest__str {
     mptest_size _size_short; /* does not include \0 */
-    mptest_size _alloc; /* does not include \0 */
+    mptest_size _alloc;      /* does not include \0 */
     mptest_char* _data;
 } mptest__str;
 
@@ -806,9 +806,10 @@ int mptest__str_insert(mptest__str* str, mptest_size index, mptest_char chr);
 const mptest_char* mptest__str_get_data(const mptest__str* str);
 int mptest__str_cmp(const mptest__str* str_a, const mptest__str* str_b);
 mptest_size mptest__str_slen(const mptest_char* chars);
+void mptest__str_clear(mptest__str* str);
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/str_view */
 typedef struct mptest__str_view {
     const mptest_char* _data;
@@ -822,8 +823,8 @@ void mptest__str_view_init_null(mptest__str_view* view);
 mptest_size mptest__str_view_size(const mptest__str_view* view);
 const mptest_char* mptest__str_view_get_data(const mptest__str_view* view);
 int mptest__str_view_cmp(const mptest__str_view* a, const mptest__str_view* b);
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 #if MPTEST_USE_APARSE
 /* bits/util/ntstr/cmp_n */
@@ -967,8 +968,8 @@ MPTEST_INTERNAL aparse_error aparse__error_print_long_opt(aparse__state* state, 
 MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg);
 #endif /* MPTEST_USE_APARSE */
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/vec */
 #define MPTEST__VEC_TYPE(T) \
     MPTEST__PASTE(T, _vec)
@@ -1284,8 +1285,8 @@ MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, 
         MPTEST__VEC_SETSIZE(T, vec, cap); \
         return 0; \
     }
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 /* mptest */
 #ifndef MPTEST_INTERNAL_H
@@ -1633,6 +1634,9 @@ MPTEST_INTERNAL void mptest__fuzz_print(struct mptest__state* state);
 #if MPTEST_USE_SYM
 MPTEST_INTERNAL void
 mptest__sym_dump(mptest_sym* sym, mptest_int32 parent_ref, mptest_int32 indent);
+MPTEST_INTERNAL int mptest__sym_parse_do(
+    mptest_sym_build* build_in, const mptest__str_view in, const char** err_msg,
+    mptest_size* err_pos);
 #endif
 
 #endif
@@ -1644,52 +1648,54 @@ MPTEST__STATIC_ASSERT(mptest__char_is_one_byte, sizeof(mptest_char) == 1);
 
 /* bits/container/str */
 /* Maximum size, without null terminator */
-#define MPTEST__STR_SHORT_SIZE_MAX (((sizeof(mptest__str) - sizeof(mptest_size)) / (sizeof(mptest_char)) - 1))
+#define MPTEST__STR_SHORT_SIZE_MAX                                                \
+    (((sizeof(mptest__str) - sizeof(mptest_size)) / (sizeof(mptest_char)) - 1))
 
 #define MPTEST__STR_GET_SHORT(str) !((str)->_size_short & 1)
-#define MPTEST__STR_SET_SHORT(str, short) \
-    do { \
-        mptest_size temp = short; \
-        (str)->_size_short &= ~((mptest_size)1); \
-        (str)->_size_short |= !temp; \
+#define MPTEST__STR_SET_SHORT(str, short)                                         \
+    do {                                                                      \
+        mptest_size temp = short;                                                 \
+        (str)->_size_short &= ~((mptest_size)1);                                  \
+        (str)->_size_short |= !temp;                                          \
     } while (0)
 #define MPTEST__STR_GET_SIZE(str) ((str)->_size_short >> 1)
-#define MPTEST__STR_SET_SIZE(str, size) \
-    do { \
-        mptest_size temp = size; \
-        (str)->_size_short &= 1; \
-        (str)->_size_short |= temp << 1; \
+#define MPTEST__STR_SET_SIZE(str, size)                                           \
+    do {                                                                      \
+        mptest_size temp = size;                                                  \
+        (str)->_size_short &= 1;                                              \
+        (str)->_size_short |= temp << 1;                                      \
     } while (0)
-#define MPTEST__STR_DATA(str) (MPTEST__STR_GET_SHORT(str) ? ((mptest_char*)&((str)->_alloc)) : (str)->_data)
+#define MPTEST__STR_DATA(str)                                                     \
+    (MPTEST__STR_GET_SHORT(str) ? ((mptest_char*)&((str)->_alloc)) : (str)->_data)
 
 /* Round up to multiple of 32 */
-#define MPTEST__STR_ROUND_ALLOC(alloc) \
-    (((alloc + 1) + 32) & (~((mptest_size)32)))
+#define MPTEST__STR_ROUND_ALLOC(alloc) (((alloc + 1) + 32) & (~((mptest_size)32)))
 
 #if MPTEST_DEBUG
 
-#define MPTEST__STR_CHECK(str) \
-    do { \
-        if (MPTEST__STR_GET_SHORT(str)) { \
-            /* If string is short, the size must always be less than */ \
-            /* MPTEST__STR_SHORT_SIZE_MAX. */ \
-            MPTEST_ASSERT(MPTEST__STR_GET_SIZE(str) <= MPTEST__STR_SHORT_SIZE_MAX); \
-        } else { \
-            /* If string is long, the size can still be less, but the other */ \
-            /* fields must be valid. */ \
-            /* Ensure there is enough space */ \
-            MPTEST_ASSERT((str)->_alloc >= MPTEST__STR_GET_SIZE(str)); \
-            /* Ensure that the _data field isn't NULL if the size is 0 */ \
-            if (MPTEST__STR_GET_SIZE(str) > 0) { \
-                MPTEST_ASSERT((str)->_data != MPTEST_NULL); \
-            } \
-            /* Ensure that if _alloc is 0 then _data is NULL */ \
-            if ((str)->_alloc == 0) { \
-                MPTEST_ASSERT((str)->_data == MPTEST_NULL); \
-            } \
-        } \
-        /* Ensure that there is a null-terminator */ \
-        MPTEST_ASSERT(MPTEST__STR_DATA(str)[MPTEST__STR_GET_SIZE(str)] == '\0'); \
+#define MPTEST__STR_CHECK(str)                                                    \
+    do {                                                                      \
+        if (MPTEST__STR_GET_SHORT(str)) {                                         \
+            /* If string is short, the size must always be less than */       \
+            /* MPTEST__STR_SHORT_SIZE_MAX. */                                     \
+            MPTEST_ASSERT(MPTEST__STR_GET_SIZE(str) <= MPTEST__STR_SHORT_SIZE_MAX);       \
+        } else {                                                              \
+            /* If string is long, the size can still be less, but the other   \
+             */                                                               \
+            /* fields must be valid. */                                       \
+            /* Ensure there is enough space */                                \
+            MPTEST_ASSERT((str)->_alloc >= MPTEST__STR_GET_SIZE(str));                \
+            /* Ensure that the _data field isn't NULL if the size is 0 */     \
+            if (MPTEST__STR_GET_SIZE(str) > 0) {                                  \
+                MPTEST_ASSERT((str)->_data != MPTEST_NULL);                           \
+            }                                                                 \
+            /* Ensure that if _alloc is 0 then _data is NULL */               \
+            if ((str)->_alloc == 0) {                                         \
+                MPTEST_ASSERT((str)->_data == MPTEST_NULL);                           \
+            }                                                                 \
+        }                                                                     \
+        /* Ensure that there is a null-terminator */                          \
+        MPTEST_ASSERT(MPTEST__STR_DATA(str)[MPTEST__STR_GET_SIZE(str)] == '\0');          \
     } while (0)
 
 #else
@@ -1711,9 +1717,7 @@ void mptest__str_destroy(mptest__str* str) {
     }
 }
 
-mptest_size mptest__str_size(const mptest__str* str) {
-    return MPTEST__STR_GET_SIZE(str);
-}
+mptest_size mptest__str_size(const mptest__str* str) { return MPTEST__STR_GET_SIZE(str); }
 
 MPTEST_INTERNAL int mptest__str_grow(mptest__str* str, mptest_size new_size) {
     mptest_size old_size = MPTEST__STR_GET_SIZE(str);
@@ -1724,9 +1728,10 @@ MPTEST_INTERNAL int mptest__str_grow(mptest__str* str, mptest_size new_size) {
             MPTEST__STR_SET_SIZE(str, new_size);
         } else {
             /* Needs allocation */
-            mptest_size new_alloc = 
-                MPTEST__STR_ROUND_ALLOC(new_size + (new_size >> 1));
-            mptest_char* new_data = (mptest_char*)MPTEST_MALLOC(sizeof(mptest_char) * (new_alloc + 1));
+            mptest_size new_alloc =
+              MPTEST__STR_ROUND_ALLOC(new_size + (new_size >> 1));
+            mptest_char* new_data =
+              (mptest_char*)MPTEST_MALLOC(sizeof(mptest_char) * (new_alloc + 1));
             mptest_size i;
             if (new_data == MPTEST_NULL) {
                 return -1;
@@ -1744,16 +1749,15 @@ MPTEST_INTERNAL int mptest__str_grow(mptest__str* str, mptest_size new_size) {
     } else {
         if (new_size > str->_alloc) {
             /* Needs allocation */
-            mptest_size new_alloc = 
-                MPTEST__STR_ROUND_ALLOC(new_size + (new_size >> 1));
+            mptest_size new_alloc =
+              MPTEST__STR_ROUND_ALLOC(new_size + (new_size >> 1));
             mptest_char* new_data;
             if (str->_alloc == 0) {
-                new_data = \
-                    (mptest_char*)MPTEST_MALLOC(sizeof(mptest_char) * (new_alloc + 1));
+                new_data =
+                  (mptest_char*)MPTEST_MALLOC(sizeof(mptest_char) * (new_alloc + 1));
             } else {
-                new_data = \
-                    (mptest_char*)MPTEST_REALLOC(
-                        str->_data, sizeof(mptest_char) * (new_alloc + 1));
+                new_data = (mptest_char*)MPTEST_REALLOC(
+                  str->_data, sizeof(mptest_char) * (new_alloc + 1));
             }
             if (new_data == MPTEST_NULL) {
                 return -1;
@@ -1917,8 +1921,13 @@ int mptest__str_cmp(const mptest__str* str_a, const mptest__str* str_b) {
     return 0;
 }
 
-#if MPTEST_USE_SYM
+void mptest__str_clear(mptest__str* str) {
+    MPTEST__STR_SET_SIZE(str, 0);
+    MPTEST__STR_DATA(str)[0] = '\0';
+}
+
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/str_view */
 void mptest__str_view_init(mptest__str_view* view, const mptest__str* other) {
     view->_size = mptest__str_size(other);
@@ -1970,8 +1979,8 @@ int mptest__str_view_cmp(const mptest__str_view* view_a, const mptest__str_view*
     }
     return 0;
 }
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 #if MPTEST_USE_SYM
 /* bits/types/fixed/int32 */
@@ -4839,11 +4848,6 @@ MPTEST_INTERNAL int mptest__sym_new(
   return err;
 }
 
-MPTEST_INTERNAL int mptest__sym_isblank(mptest_char ch)
-{
-  return (ch == '\n') || (ch == '\t') || (ch == '\r') || (ch == ' ');
-}
-
 MPTEST__VEC_DECL(mptest_sym_build);
 MPTEST__VEC_IMPL_FUNC(mptest_sym_build, init)
 MPTEST__VEC_IMPL_FUNC(mptest_sym_build, destroy)
@@ -4851,319 +4855,427 @@ MPTEST__VEC_IMPL_FUNC(mptest_sym_build, push)
 MPTEST__VEC_IMPL_FUNC(mptest_sym_build, pop)
 MPTEST__VEC_IMPL_FUNC(mptest_sym_build, getref)
 
+#define MPTEST__SYM_PARSE_ERROR -1
+
 typedef struct mptest__sym_parse {
-  mptest_sym_build_vec sym_stack;
-  mptest_size sym_stack_ptr;
-  mptest_sym_build* base_build;
-  mptest__str atom_str;
-  mptest_int32 num;
+  const char* str;
+  mptest_size str_pos;
+  mptest_size str_size;
+  mptest_sym_build_vec stk;
+  mptest_size stk_ptr;
+  const char* error;
+  mptest__str build_str;
 } mptest__sym_parse;
 
-typedef enum mptest__sym_parse_state {
-  MPTEST__SYM_PARSE_STATE_EXPR,
-  MPTEST__SYM_PARSE_STATE_ATOM,
-  MPTEST__SYM_PARSE_STATE_NUM,
-  MPTEST__SYM_PARSE_STATE_NUM_HEX,
-  MPTEST__SYM_PARSE_STATE_NUM_HEX_X,
-  MPTEST__SYM_PARSE_STATE_STRING,
-  MPTEST__SYM_PARSE_STATE_STRING_ESCAPE,
-  MPTEST__SYM_PARSE_STATE_CHAR,
-  MPTEST__SYM_PARSE_STATE_CHAR_ESCAPE,
-  MPTEST__SYM_PARSE_STATE_CHAR_AFTER
-} mptest__sym_parse_state;
+void mptest__sym_parse_init(mptest__sym_parse* parse, const mptest__str_view in)
+{
+  parse->str = mptest__str_view_get_data(&in);
+  parse->str_pos = 0;
+  parse->str_size = mptest__str_view_size(&in);
+  mptest_sym_build_vec_init(&parse->stk);
+  parse->stk_ptr = 0;
+  parse->error = MPTEST_NULL;
+  mptest__str_init(&parse->build_str);
+}
 
-MPTEST_INTERNAL int mptest__sym_parse_expr_begin(mptest__sym_parse* parse)
+void mptest__sym_parse_destroy(mptest__sym_parse* parse)
+{
+  mptest_sym_build_vec_destroy(&parse->stk);
+  mptest__str_destroy(&parse->build_str);
+}
+
+int mptest__sym_parse_next(mptest__sym_parse* parse)
+{
+  MPTEST_ASSERT(parse->str_pos <= parse->str_size);
+  if (parse->str_pos == parse->str_size) {
+    parse->str_pos++;
+    return -1;
+  } else {
+    return parse->str[parse->str_pos++];
+  }
+}
+
+MPTEST_INTERNAL int mptest__sym_parse_expr_begin(
+    mptest__sym_parse* parse, mptest_sym_build* base_build)
 {
   int err = 0;
   mptest_sym_build next_build;
-  if (parse->sym_stack_ptr == 0) {
-    if ((err = mptest_sym_build_expr(parse->base_build, &next_build))) {
+  if (parse->stk_ptr == 0) {
+    if ((err = mptest_sym_build_expr(base_build, &next_build))) {
       return err;
     }
   } else {
     if ((err = mptest_sym_build_expr(
-             mptest_sym_build_vec_getref(
-                 &parse->sym_stack, parse->sym_stack_ptr - 1),
+             mptest_sym_build_vec_getref(&parse->stk, parse->stk_ptr - 1),
              &next_build))) {
       return err;
     }
   }
-  if ((err = mptest_sym_build_vec_push(&parse->sym_stack, next_build))) {
+  if ((err = mptest_sym_build_vec_push(&parse->stk, next_build))) {
     return err;
   }
-  parse->sym_stack_ptr++;
+  parse->stk_ptr++;
   return err;
 }
 
 MPTEST_INTERNAL int mptest__sym_parse_expr_end(mptest__sym_parse* parse)
 {
-  if (parse->sym_stack_ptr == 0) {
-    return 1;
+  if (parse->stk_ptr == 0) {
+    parse->error = "unmatched ')'";
+    return MPTEST__SYM_PARSE_ERROR;
   }
-  parse->sym_stack_ptr--;
-  mptest_sym_build_vec_pop(&parse->sym_stack);
+  parse->stk_ptr--;
+  mptest_sym_build_vec_pop(&parse->stk);
   return 0;
 }
 
-MPTEST_INTERNAL int mptest__sym_parse_esc(mptest__sym_parse* parse, mptest_char ch)
+MPTEST_INTERNAL int mptest__sym_parse_isblank(int ch)
 {
-  if (ch == 'n') {
-    parse->num = '\n';
-  } else if (ch == 'r') {
-    parse->num = '\r';
-  } else if (ch == '0') {
-    parse->num = '\0';
-  } else if (ch == 't') {
-    parse->num = '\t';
-  } else {
-    return 0;
-  }
-  return 1;
+  return (ch == '\n') || (ch == '\t') || (ch == '\r') || (ch == ' ');
 }
 
-MPTEST_INTERNAL int mptest__sym_do_parse(
+MPTEST_INTERNAL int mptest__sym_parse_ispunc(int ch)
+{
+  return (ch == '(') || (ch == ')');
+}
+
+MPTEST_INTERNAL int mptest__sym_parse_hexdig(int ch)
+{
+  if (ch >= '0' && ch <= '9') {
+    return ch - '0';
+  } else if (ch >= 'A' && ch <= 'F') {
+    return ch - 'A' + 10;
+  } else if (ch >= 'a' && ch <= 'f') {
+    return ch - 'a' + 10;
+  } else {
+    return -1;
+  }
+}
+
+MPTEST_INTERNAL int mptest__sym_parse_esc(mptest__sym_parse* parse)
+{
+  int ch = mptest__sym_parse_next(parse);
+  if (ch == -1) {
+    parse->error = "unfinished escape sequence";
+    return MPTEST__SYM_PARSE_ERROR;
+  } else if (ch == 't') {
+    return '\t';
+  } else if (ch == 'r') {
+    return '\r';
+  } else if (ch == '0') {
+    return '\0';
+  } else if (ch == 'n') {
+    return '\n';
+  } else if (ch == 'x') {
+    int out_ch = 0;
+    int dig;
+    ch = mptest__sym_parse_next(parse);
+    if ((dig = mptest__sym_parse_hexdig(ch)) == -1) {
+      parse->error = "invalid hex escape";
+      return MPTEST__SYM_PARSE_ERROR;
+    }
+    out_ch = dig;
+    ch = mptest__sym_parse_next(parse);
+    if ((dig = mptest__sym_parse_hexdig(ch)) == -1) {
+      parse->error = "invalid hex escape";
+      return MPTEST__SYM_PARSE_ERROR;
+    }
+    out_ch *= 16;
+    out_ch += dig;
+    return out_ch;
+  } else if (ch == 'u') {
+    int out_ch = 0;
+    int dig;
+    ch = mptest__sym_parse_next(parse);
+    if ((dig = mptest__sym_parse_hexdig(ch)) == -1) {
+      parse->error = "invalid unicode escape";
+      return MPTEST__SYM_PARSE_ERROR;
+    }
+    out_ch = dig;
+    ch = mptest__sym_parse_next(parse);
+    if ((dig = mptest__sym_parse_hexdig(ch)) == -1) {
+      parse->error = "invalid unicode escape";
+      return MPTEST__SYM_PARSE_ERROR;
+    }
+    out_ch *= 16;
+    out_ch += dig;
+    ch = mptest__sym_parse_next(parse);
+    if ((dig = mptest__sym_parse_hexdig(ch)) == -1) {
+      parse->error = "invalid unicode escape";
+      return MPTEST__SYM_PARSE_ERROR;
+    }
+    out_ch *= 16;
+    out_ch += dig;
+    ch = mptest__sym_parse_next(parse);
+    if ((dig = mptest__sym_parse_hexdig(ch)) == -1) {
+      parse->error = "invalid unicode escape";
+      return MPTEST__SYM_PARSE_ERROR;
+    }
+    out_ch *= 16;
+    out_ch += dig;
+    return out_ch;
+  } else if (ch == '"') {
+    return '"';
+  } else {
+    parse->error = "invalid escape character";
+    return MPTEST__SYM_PARSE_ERROR;
+  }
+}
+
+MPTEST_INTERNAL int mptest__sym_parse_gen_utf8(int codep, unsigned char* out_buf)
+{
+  if (codep <= 0x7F) {
+    out_buf[0] = codep & 0x7F;
+    return 1;
+  } else if (codep <= 0x07FF) {
+    out_buf[0] = (unsigned char)(((codep >> 6) & 0x1F) | 0xC0);
+    out_buf[1] = (unsigned char)(((codep >> 0) & 0x3F) | 0x80);
+    return 2;
+  } else if (codep <= 0xFFFF) {
+    out_buf[0] = (unsigned char)(((codep >> 12) & 0x0F) | 0xE0);
+    out_buf[1] = (unsigned char)(((codep >> 6) & 0x3F) | 0x80);
+    out_buf[2] = (unsigned char)(((codep >> 0) & 0x3F) | 0x80);
+    return 3;
+  } else if (codep <= 0x10FFFF) {
+    out_buf[0] = (unsigned char)(((codep >> 18) & 0x07) | 0xF0);
+    out_buf[1] = (unsigned char)(((codep >> 12) & 0x3F) | 0x80);
+    out_buf[2] = (unsigned char)(((codep >> 6) & 0x3F) | 0x80);
+    out_buf[3] = (unsigned char)(((codep >> 0) & 0x3F) | 0x80);
+    return 4;
+  } else {
+    return -1;
+  }
+}
+
+MPTEST_INTERNAL int mptest__sym_parse_do(
     mptest_sym_build* build_in, const mptest__str_view in, const char** err_msg,
     mptest_size* err_pos)
 {
-  mptest__sym_parse parse;
-  mptest_size str_loc = 0;
   int err = 0;
-  int state = MPTEST__SYM_PARSE_STATE_EXPR;
-  mptest_sym_build_vec_init(&parse.sym_stack);
-  parse.sym_stack_ptr = 0;
-  parse.num = 0;
-  mptest__str_init(&parse.atom_str);
-  parse.base_build = build_in;
-  while (str_loc != mptest__str_view_size(&in)) {
-    mptest_char ch = mptest__str_view_get_data(&in)[str_loc];
-    mptest_sym_build* current_build = parse.base_build;
-    if (parse.sym_stack_ptr) {
-      current_build = mptest_sym_build_vec_getref(
-          &parse.sym_stack, parse.sym_stack_ptr - 1);
+  mptest__sym_parse parse;
+  mptest__sym_parse_init(&parse, in);
+  while (1) {
+    int ch = mptest__sym_parse_next(&parse);
+    mptest_sym_build* build;
+    if (parse.stk_ptr) {
+      build = mptest_sym_build_vec_getref(&parse.stk, parse.stk_ptr - 1);
+    } else {
+      build = build_in;
     }
-    if (state == MPTEST__SYM_PARSE_STATE_EXPR) {
-      if (mptest__sym_isblank(ch)) {
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (ch == '(') {
-        if ((err = mptest__sym_parse_expr_begin(&parse))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (ch == ')') {
-        if ((err = mptest__sym_parse_expr_end(&parse))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (ch == '0') {
-        parse.num = 0;
-        state = MPTEST__SYM_PARSE_STATE_NUM_HEX_X;
-      } else if (
-          ch == '1' || ch == '2' || ch == '3' || ch == '4' || ch == '5' ||
-          ch == '6' || ch == '7' || ch == '8' || ch == '9') {
-        parse.num = ch - '0';
-        state = MPTEST__SYM_PARSE_STATE_NUM;
-      } else if (ch == '"') {
-        mptest__str_destroy(&parse.atom_str);
-        mptest__str_init(&parse.atom_str);
-        state = MPTEST__SYM_PARSE_STATE_STRING;
-      } else if (ch == '\'') {
-        state = MPTEST__SYM_PARSE_STATE_CHAR;
-      } else {
-        mptest__str_destroy(&parse.atom_str);
-        mptest__str_init(&parse.atom_str);
-        if ((err = mptest__str_cat_n(&parse.atom_str, &ch, 1))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_ATOM;
-      }
-    } else if (state == MPTEST__SYM_PARSE_STATE_ATOM) {
-      if (mptest__sym_isblank(ch)) {
-        if ((err = mptest_sym_build_str(
-                 current_build, (const char*)mptest__str_get_data(&parse.atom_str),
-                 mptest__str_size(&parse.atom_str)))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (ch == '(') {
-        if ((err = mptest_sym_build_str(
-                 current_build, (const char*)mptest__str_get_data(&parse.atom_str),
-                 mptest__str_size(&parse.atom_str)))) {
-          goto error;
-        }
-        if ((err = mptest__sym_parse_expr_begin(&parse))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (ch == ')') {
-        if ((err = mptest_sym_build_str(
-                 current_build, (const char*)mptest__str_get_data(&parse.atom_str),
-                 mptest__str_size(&parse.atom_str)))) {
-          goto error;
-        }
-        if ((err = mptest__sym_parse_expr_end(&parse))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else {
-        if ((err = mptest__str_cat_n(&parse.atom_str, &ch, 1))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_ATOM;
-      }
-    } else if (state == MPTEST__SYM_PARSE_STATE_NUM) {
-      if (mptest__sym_isblank(ch)) {
-        if ((err = mptest_sym_build_num(current_build, parse.num))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (
-          ch == '0' || ch == '1' || ch == '2' || ch == '3' || ch == '4' ||
-          ch == '5' || ch == '6' || ch == '7' || ch == '8' || ch == '9') {
-        parse.num *= 10;
-        parse.num += ch - '0';
-        state = MPTEST__SYM_PARSE_STATE_NUM;
-      } else if (ch == ')') {
-        if ((err = mptest_sym_build_num(current_build, parse.num))) {
-          goto error;
-        }
-        if ((err = mptest__sym_parse_expr_end(&parse))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else {
-        *err_msg = "invalid character for number literal";
-        err = 2;
+    mptest__str_clear(&parse.build_str);
+    if (ch == -1) {
+      break;
+    } else if (ch == '(') {
+      /* ( | Begin expression */
+      if ((err = mptest__sym_parse_expr_begin(&parse, build_in))) {
         goto error;
       }
-    } else if (state == MPTEST__SYM_PARSE_STATE_NUM_HEX_X) {
-      if (mptest__sym_isblank(ch)) {
-        if ((err = mptest_sym_build_num(current_build, 0))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (ch == 'x') {
-        state = MPTEST__SYM_PARSE_STATE_NUM_HEX;
-      } else if (ch == ')') {
-        if ((err = mptest_sym_build_num(current_build, 0))) {
-          goto error;
-        }
-        if ((err = mptest__sym_parse_expr_end(&parse))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else {
-        *err_msg = "expected a 'x' for hex literal";
-        err = 2;
+    } else if (ch == ')') {
+      /* ) | End expression */
+      if ((err = mptest__sym_parse_expr_end(&parse))) {
         goto error;
       }
-    } else if (state == MPTEST__SYM_PARSE_STATE_NUM_HEX) {
-      if (mptest__sym_isblank(ch)) {
-        if ((err = mptest_sym_build_num(current_build, parse.num))) {
+    } else if (mptest__sym_parse_isblank(ch)) {
+      /* <\s> | Whitespace */
+      continue;
+    } else if (ch == '0') {
+      /* 0 | Start of hex literal, or just a zero */
+      mptest_int32 num = 0;
+      mptest_size saved_pos = parse.str_pos;
+      int n = 0;
+      ch = mptest__sym_parse_next(&parse);
+      if (mptest__sym_parse_ispunc(ch) || mptest__sym_parse_isblank(ch) ||
+          ch == -1) {
+        /* 0 | Just a zero */
+        parse.str_pos = saved_pos;
+        if ((err = mptest_sym_build_num(build, 0))) {
           goto error;
         }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (
-          ch == '0' || ch == '1' || ch == '2' || ch == '3' || ch == '4' ||
-          ch == '5' || ch == '6' || ch == '7' || ch == '8' || ch == '9') {
-        parse.num *= 16;
-        parse.num += ch - '0';
-        state = MPTEST__SYM_PARSE_STATE_NUM_HEX;
-      } else if (
-          ch == 'A' || ch == 'B' || ch == 'C' || ch == 'D' || ch == 'E' ||
-          ch == 'F') {
-        parse.num *= 16;
-        parse.num += (ch - 'A') + 10;
-        state = MPTEST__SYM_PARSE_STATE_NUM_HEX;
-      } else if (ch == ')') {
-        if ((err = mptest_sym_build_num(current_build, parse.num))) {
-          goto error;
-        }
-        if ((err = mptest__sym_parse_expr_end(&parse))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else {
-        *err_msg = "invalid character for hex literal";
-        err = 2;
+        continue;
+      }
+      if (ch != 'x') {
+        parse.error = "invalid hex literal";
+        err = MPTEST__SYM_PARSE_ERROR;
         goto error;
       }
-    } else if (state == MPTEST__SYM_PARSE_STATE_STRING) {
-      if (ch == '"') {
-        if ((err = mptest_sym_build_str(
-                 current_build, (const char*)mptest__str_get_data(&parse.atom_str),
-                 mptest__str_size(&parse.atom_str)))) {
+      while (1) {
+        int dig;
+        saved_pos = parse.str_pos;
+        ch = mptest__sym_parse_next(&parse);
+        if (n == 8) {
+          parse.error = "hex literal too long";
+          err = MPTEST__SYM_PARSE_ERROR;
           goto error;
         }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
+        if ((dig = mptest__sym_parse_hexdig(ch)) != -1) {
+          /* [0-9A-Fa-f] | Hex digit */
+          num *= 16;
+          num += dig;
+        } else {
+          if ((mptest__sym_parse_isblank(ch) || mptest__sym_parse_ispunc(ch) ||
+               ch == -1) &&
+              n != 0) {
+            /* [\s)] | Continue */
+            parse.str_pos = saved_pos;
+            if ((err = mptest_sym_build_num(build, num))) {
+              goto error;
+            }
+            break;
+          } else {
+            /* Everything else | Error */
+            parse.error = "expected hex digits for hex literal";
+            err = MPTEST__SYM_PARSE_ERROR;
+            goto error;
+          }
+        }
+        n++;
+      }
+    } else if (ch > '0' && ch <= '9') {
+      /* 1-9 | Integer literal */
+      mptest_int32 num = ch - '0';
+      mptest_size saved_pos;
+      int n = 1;
+      while (1) {
+        saved_pos = parse.str_pos;
+        ch = mptest__sym_parse_next(&parse);
+        if (n == 10) {
+          parse.error = "decimal literal too long";
+          err = MPTEST__SYM_PARSE_ERROR;
+          goto error;
+        }
+        if (ch >= '0' && ch <= '9') {
+          num *= 10;
+          num += ch - '0';
+        } else {
+          if (mptest__sym_parse_isblank(ch) || mptest__sym_parse_ispunc(ch) ||
+              ch == -1) {
+            parse.str_pos = saved_pos;
+            if ((err = mptest_sym_build_num(build, num))) {
+              goto error;
+            }
+            break;
+          } else {
+            parse.error = "expected decimal digits for decimal literal";
+            err = MPTEST__SYM_PARSE_ERROR;
+            goto error;
+          }
+        }
+        n++;
+      }
+    } else if (ch == '"') {
+      /* " | String starter */
+      while (1) {
+        ch = mptest__sym_parse_next(&parse);
+        if (ch == -1) {
+          /* "<EOF> | Invalid, error */
+          parse.error = "unfinished string literal";
+          err = MPTEST__SYM_PARSE_ERROR;
+          goto error;
+        } else if (ch == '\\') {
+          /* "\ | Escape sequence starter */
+          int rune = mptest__sym_parse_esc(&parse);
+          unsigned char ubuf[8];
+          int ubuf_sz = 0;
+          if (rune < 0) {
+            err = rune;
+            goto error;
+          }
+          if ((ubuf_sz = mptest__sym_parse_gen_utf8(rune, ubuf)) < 0) {
+            parse.error = "invalid UTF-8 character number";
+            err = MPTEST__SYM_PARSE_ERROR;
+            goto error;
+          }
+          if ((err = mptest__str_cat_n(
+                   &parse.build_str, (char*)ubuf, (mptest_size)ubuf_sz))) {
+            goto error;
+          }
+        } else if (ch == '"') {
+          /* "" | Finish string */
+          if ((err = mptest_sym_build_str(
+                   build, (const char*)mptest__str_get_data(&parse.build_str),
+                   mptest__str_size(&parse.build_str)))) {
+            goto error;
+          }
+          break;
+        } else {
+          /* <*> | Add to string */
+          char ch_char = (char)ch;
+          if ((err = mptest__str_cat_n(&parse.build_str, &ch_char, 1))) {
+            goto error;
+          }
+        }
+      }
+    } else if (ch == '\'') {
+      /* ' | Char starter */
+      int rune;
+      unsigned char ubuf[8];
+      int ubuf_sz = 0;
+      ch = mptest__sym_parse_next(&parse);
+      if (ch == -1) {
+        parse.error = "expected character for character literal";
+        err = MPTEST__SYM_PARSE_ERROR;
+        goto error;
       } else if (ch == '\\') {
-        state = MPTEST__SYM_PARSE_STATE_STRING_ESCAPE;
+        rune = mptest__sym_parse_esc(&parse);
       } else {
-        if ((err = mptest__str_cat_n(&parse.atom_str, &ch, 1))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_STRING;
+        rune = ch;
       }
-    } else if (state == MPTEST__SYM_PARSE_STATE_STRING_ESCAPE) {
-      if (mptest__sym_parse_esc(&parse, ch)) {
-        mptest_char n = (mptest_char)parse.num;
-        if ((err = mptest__str_cat_n(&parse.atom_str, &n, 1))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_STRING;
-      } else {
-        *err_msg = "invalid escape character";
-        err = 2;
+      if (rune < 0) {
+        err = rune;
         goto error;
       }
-    } else if (state == MPTEST__SYM_PARSE_STATE_CHAR) {
-      if (ch == '\'') {
-        if ((err = mptest_sym_build_num(current_build, 0))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else if (ch == '\\') {
-        state = MPTEST__SYM_PARSE_STATE_CHAR_ESCAPE;
-      } else {
-        parse.num = ch;
-        state = MPTEST__SYM_PARSE_STATE_CHAR_AFTER;
-      }
-    } else if (state == MPTEST__SYM_PARSE_STATE_CHAR_ESCAPE) {
-      if (mptest__sym_parse_esc(&parse, ch)) {
-        mptest_char n = (mptest_char)parse.num;
-        if ((err = mptest__str_cat_n(&parse.atom_str, &n, 1))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_CHAR_AFTER;
-      } else {
-        *err_msg = "invalid escape character";
-        err = 2;
+      if ((ubuf_sz = mptest__sym_parse_gen_utf8(rune, ubuf)) < 0) {
+        parse.error = "invalid UTF-8 character number";
+        err = MPTEST__SYM_PARSE_ERROR;
         goto error;
       }
-    } else if (state == MPTEST__SYM_PARSE_STATE_CHAR_AFTER) {
-      if (ch == '\'') {
-        if ((err = mptest_sym_build_num(current_build, parse.num))) {
-          goto error;
-        }
-        state = MPTEST__SYM_PARSE_STATE_EXPR;
-      } else {
-        *err_msg = "expected a \'";
-        err = 2;
+      ch = mptest__sym_parse_next(&parse);
+      if (ch == -1 || ch != '\'') {
+        parse.error = "expected ' to close character literal";
+        err = MPTEST__SYM_PARSE_ERROR;
         goto error;
+      }
+      if ((err = mptest_sym_build_num(build, rune))) {
+        goto error;
+      }
+    } else {
+      /* <*> | Add to atom */
+      char ch_char = (char)ch;
+      if ((err = mptest__str_cat_n(&parse.build_str, &ch_char, 1))) {
+        goto error;
+      }
+      while (1) {
+        mptest_size saved_pos = parse.str_pos;
+        ch = mptest__sym_parse_next(&parse);
+        if (mptest__sym_parse_isblank(ch) || mptest__sym_parse_ispunc(ch) ||
+            ch == -1) {
+          /* [\s()<EOF>] | Build string */
+          if ((err = mptest_sym_build_str(
+                   build, (const char*)mptest__str_get_data(&parse.build_str),
+                   mptest__str_size(&parse.build_str)))) {
+            goto error;
+          }
+          parse.str_pos = saved_pos;
+          break;
+        } else {
+          /* <*> | Add to string */
+          ch_char = (char)ch;
+          if ((err = mptest__str_cat_n(&parse.build_str, &ch_char, 1))) {
+            goto error;
+          }
+        }
       }
     }
-    str_loc++;
   }
-  if (state != MPTEST__SYM_PARSE_STATE_EXPR) {
-    *err_msg = "top-level tree must be an expression, not an atom";
-    err = 2;
+  if (parse.stk_ptr) {
+    parse.error = "unmatched '('";
+    err = MPTEST__SYM_PARSE_ERROR;
     goto error;
   }
 error:
-  if (err == 2) {
-    *err_pos = str_loc;
-  }
-  mptest_sym_build_vec_destroy(&parse.sym_stack);
-  mptest__str_destroy(&parse.atom_str);
+  *err_pos = parse.str_pos;
+  *err_msg = parse.error;
+  mptest__sym_parse_destroy(&parse);
   return err;
 }
 
@@ -5542,7 +5654,7 @@ MPTEST_API int mptest__sym_check_init(
   mptest__str_view_init_n(&in_str_view, str, mptest__str_slen(str));
   mptest_sym_build_init(
       &parse_build, sym_expected, MPTEST__SYM_NONE, MPTEST__SYM_NONE);
-  if ((err = mptest__sym_do_parse(
+  if ((err = mptest__sym_parse_do(
            &parse_build, in_str_view, &err_msg, &err_pos))) {
     goto error;
   }
@@ -5558,14 +5670,14 @@ error:
     mptest__sym_destroy(sym_expected);
     MPTEST_FREE(sym_expected);
   }
-  if (err == 2) { /* parse error */
+  if (err == MPTEST__SYM_PARSE_ERROR) { /* parse error */
     mptest__state_g.fail_reason = MPTEST__FAIL_REASON_SYM_SYNTAX;
     mptest__state_g.fail_file = file;
     mptest__state_g.fail_line = line;
     mptest__state_g.fail_msg = msg;
     mptest__state_g.fail_data.sym_syntax_error_data.err_msg = err_msg;
     mptest__state_g.fail_data.sym_syntax_error_data.err_pos = err_pos;
-  } else if (err == 1) { /* no mem */
+  } else if (err == -1) { /* no mem */
     mptest__state_g.fail_reason = MPTEST__FAIL_REASON_NOMEM;
     mptest__state_g.fail_file = file;
     mptest__state_g.fail_line = line;
@@ -5615,7 +5727,7 @@ MPTEST_API int mptest__sym_make_init(
   mptest_sym_build_init(build_out, sym_out, MPTEST__SYM_NONE, MPTEST__SYM_NONE);
   mptest__str_view_init_n(&in_str_view, str, mptest__str_slen(str));
   if ((err =
-           mptest__sym_do_parse(build_out, in_str_view, &err_msg, &err_pos))) {
+           mptest__sym_parse_do(build_out, in_str_view, &err_msg, &err_pos))) {
     goto error;
   }
   mptest_sym_walk_init(walk_out, sym_out, MPTEST__SYM_NONE, MPTEST__SYM_NONE);
@@ -5625,14 +5737,14 @@ error:
     mptest__sym_destroy(sym_out);
     MPTEST_FREE(sym_out);
   }
-  if (err == 2) { /* parse error */
+  if (err == MPTEST__SYM_PARSE_ERROR) { /* parse error */
     mptest__state_g.fail_reason = MPTEST__FAIL_REASON_SYM_SYNTAX;
     mptest__state_g.fail_file = file;
     mptest__state_g.fail_line = line;
     mptest__state_g.fail_msg = msg;
     mptest__state_g.fail_data.sym_syntax_error_data.err_msg = err_msg;
     mptest__state_g.fail_data.sym_syntax_error_data.err_pos = err_pos;
-  } else if (err == 1) { /* no mem */
+  } else if (err == -1) { /* no mem */
     mptest__state_g.fail_reason = MPTEST__FAIL_REASON_NOMEM;
     mptest__state_g.fail_file = file;
     mptest__state_g.fail_line = line;

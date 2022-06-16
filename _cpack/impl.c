@@ -283,8 +283,8 @@ void mn__str_clear(mn__str* str) {
     MN__STR_DATA(str)[0] = '\0';
 }
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/str_view */
 void mn__str_view_init(mn__str_view* view, const mn__str* other) {
     view->_size = mn__str_size(other);
@@ -336,8 +336,8 @@ int mn__str_view_cmp(const mn__str_view* view_a, const mn__str_view* view_b) {
     }
     return 0;
 }
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 #if MPTEST_USE_SYM
 /* bits/types/fixed/int32 */

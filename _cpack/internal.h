@@ -46,8 +46,8 @@ int mn__str_cmp(const mn__str* str_a, const mn__str* str_b);
 mn_size mn__str_slen(const mn_char* chars);
 void mn__str_clear(mn__str* str);
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/str_view */
 typedef struct mn__str_view {
     const mn_char* _data;
@@ -61,8 +61,8 @@ void mn__str_view_init_null(mn__str_view* view);
 mn_size mn__str_view_size(const mn__str_view* view);
 const mn_char* mn__str_view_get_data(const mn__str_view* view);
 int mn__str_view_cmp(const mn__str_view* a, const mn__str_view* b);
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 #if MPTEST_USE_APARSE
 /* bits/util/ntstr/cmp_n */
@@ -206,8 +206,8 @@ MN_INTERNAL aparse_error aparse__error_print_long_opt(aparse__state* state, cons
 MN_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg);
 #endif /* MPTEST_USE_APARSE */
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/vec */
 #define MN__VEC_TYPE(T) \
     MN__PASTE(T, _vec)
@@ -523,7 +523,7 @@ MN_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, cons
         MN__VEC_SETSIZE(T, vec, cap); \
         return 0; \
     }
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 #endif /* MN__MPTEST_INTERNAL_H */

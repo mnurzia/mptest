@@ -124,15 +124,15 @@ MN_INTERNAL void mptest__aparse_destroy(struct mptest__state* state)
   mptest__aparse_state* test_state = &state->aparse_state;
   mptest__aparse_name* name = test_state->opt_test_name_head;
   while (name) {
-    mptest__aparse_name* temp = name;
-    MN_FREE(temp);
-    name = temp->next;
+    mptest__aparse_name* next = name->next;
+    MN_FREE(name);
+    name = next;
   }
   name = test_state->opt_suite_name_head;
   while (name) {
-    mptest__aparse_name* temp = name;
-    MN_FREE(temp);
-    name = temp->next;
+    mptest__aparse_name* next = name->next;
+    MN_FREE(name);
+    name = next;
   }
   aparse_destroy(&test_state->aparse);
 }
@@ -170,7 +170,7 @@ MN_INTERNAL int mptest__aparse_match_test_name(
     return 1;
   }
   while (name) {
-    if (mn__scmp_n(name->name, name->name_len, test_name)) {
+    if (mn__strstr_n(test_name, name->name, name->name_len)) {
       return 1;
     }
     name = name->next;
@@ -186,7 +186,7 @@ MN_INTERNAL int mptest__aparse_match_suite_name(
     return 1;
   }
   while (name) {
-    if (mn__scmp_n(name->name, name->name_len, suite_name)) {
+    if (mn__strstr_n(suite_name, name->name, name->name_len)) {
       return 1;
     }
     name = name->next;

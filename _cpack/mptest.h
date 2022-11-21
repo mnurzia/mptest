@@ -122,17 +122,19 @@ typedef MPTEST_SIZE_TYPE mptest_size;
 /* bits/util/cstd */
 /* If __STDC__ is not defined, assume C89. */
 #ifndef __STDC__
-    #define MPTEST__CSTD 1989
+#define MPTEST__CSTD 1989
 #else
-    #if defined(__STDC_VERSION__)
-        #if __STDC_VERSION__ >= 201112L
-            #define MPTEST__CSTD 2011
-        #elif __STDC_VERSION__ >= 199901L
-            #define MPTEST__CSTD 1999
-        #else
-            #define MPTEST__CSTD 1989
-        #endif
-    #endif
+#if defined(__STDC_VERSION__)
+#if __STDC_VERSION__ >= 201112L
+#define MPTEST__CSTD 2011
+#elif __STDC_VERSION__ >= 199901L
+#define MPTEST__CSTD 1999
+#else
+#define MPTEST__CSTD 1989
+#endif
+#else
+#define MPTEST__CSTD_1989
+#endif
 #endif
 
 /* bits/util/debug */
@@ -215,8 +217,7 @@ typedef MPTEST_INT32_TYPE mptest_int32;
  * | <0_OR_1_EQ> | *   | *    | *   |     |      |     | *     |       |
  * | <0_OR_MORE> | *   | *    | *   | *   | *    | *   | *     | *     |
  * | <1_OR_MORE> |     | *    |     | *   | *    |     | *     | *     | */
-typedef enum aparse_nargs
-{
+typedef enum aparse_nargs {
     /* Parse either zero or 1 subarguments. */
     APARSE_NARGS_0_OR_1 = -1, /* Like regex '?' */
     /* Parse either zero or 1 subarguments, but only allow using '='. */
@@ -234,14 +235,19 @@ typedef struct aparse_state {
     aparse__state* state;
 } aparse_state;
 
-typedef aparse_error (*aparse_out_cb)(void* user, const char* buf, mptest_size buf_size);
-typedef aparse_error (*aparse_custom_cb)(void* user, aparse_state* state, int sub_arg_idx, const char* text, mptest_size text_size);
+typedef aparse_error (*aparse_out_cb)(
+  void* user, const char* buf, mptest_size buf_size);
+typedef aparse_error (*aparse_custom_cb)(
+  void* user, aparse_state* state, int sub_arg_idx, const char* text,
+  mptest_size text_size);
 
 MPTEST_API aparse_error aparse_init(aparse_state* state);
-MPTEST_API void aparse_set_out_cb(aparse_state* state, aparse_out_cb out_cb, void* user);
+MPTEST_API void
+aparse_set_out_cb(aparse_state* state, aparse_out_cb out_cb, void* user);
 MPTEST_API void aparse_destroy(aparse_state* state);
 
-MPTEST_API aparse_error aparse_add_opt(aparse_state* state, char short_opt, const char* long_opt);
+MPTEST_API aparse_error
+aparse_add_opt(aparse_state* state, char short_opt, const char* long_opt);
 MPTEST_API aparse_error aparse_add_pos(aparse_state* state, const char* name);
 MPTEST_API aparse_error aparse_add_sub(aparse_state* state);
 
@@ -249,17 +255,26 @@ MPTEST_API void aparse_arg_help(aparse_state* state, const char* help_text);
 MPTEST_API void aparse_arg_metavar(aparse_state* state, const char* metavar);
 
 MPTEST_API void aparse_arg_type_bool(aparse_state* state, int* out);
-MPTEST_API void aparse_arg_type_str(aparse_state* state, const char** out, mptest_size* out_size);
+MPTEST_API void
+aparse_arg_type_store_int(aparse_state* state, int value, int* out);
+MPTEST_API void
+aparse_arg_type_str(aparse_state* state, const char** out, mptest_size* out_size);
+MPTEST_API void aparse_arg_type_int(aparse_state* state, int* out);
 MPTEST_API void aparse_arg_type_help(aparse_state* state);
 MPTEST_API void aparse_arg_type_version(aparse_state* state);
-MPTEST_API void aparse_arg_type_custom(aparse_state* state, aparse_custom_cb cb, void* user, aparse_nargs nargs);
+MPTEST_API void aparse_arg_type_custom(
+  aparse_state* state, aparse_custom_cb cb, void* user, aparse_nargs nargs);
 
-/* MPTEST_API void aparse_arg_int_multi(aparse_state* state, int** out, mptest_size* out_size) */
-/* MPTEST_API void aparse_arg_str_multi(aparse_state* state, const char** out, mptest_size** size_out, mptest_size* num) */
+/* MPTEST_API void aparse_arg_int_multi(aparse_state* state, int** out, mptest_size*
+ * out_size) */
+/* MPTEST_API void aparse_arg_str_multi(aparse_state* state, const char** out,
+ * mptest_size** size_out, mptest_size* num) */
 
-MPTEST_API int aparse_sub_add_cmd(aparse_state* state, const char* name, aparse_state** subcmd);
+MPTEST_API int aparse_sub_add_cmd(
+  aparse_state* state, const char* name, aparse_state** subcmd);
 
-MPTEST_API aparse_error aparse_parse(aparse_state* state, int argc, const char* const* argv);
+MPTEST_API aparse_error
+aparse_parse(aparse_state* state, int argc, const char* const* argv);
 #endif /* MPTEST_USE_APARSE */
 
 /* mptest */
@@ -334,6 +349,7 @@ MPTEST_API void mptest__leakcheck_set(struct mptest__state* state, int on);
 MPTEST_API void mptest_ex_nomem(void);
 MPTEST_API void mptest_ex_oom_inject(void);
 MPTEST_API void mptest_ex_bad_alloc(void);
+MPTEST_API void mptest_malloc_dump(void);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -351,14 +367,16 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 
 #define _ASSERT_PASS_BEHAVIOR(expr, msg)                                       \
   do {                                                                         \
-    mptest__assert_pass(&mptest__state_g, #msg, #expr, __FILE__, __LINE__);    \
+    mptest__assert_pass(&mptest__state_g, msg, #expr, __FILE__, __LINE__);     \
   } while (0)
 
 #define _ASSERT_FAIL_BEHAVIOR(expr, msg)                                       \
   do {                                                                         \
-    mptest__assert_fail(&mptest__state_g, #msg, #expr, __FILE__, __LINE__);    \
+    mptest__assert_fail(&mptest__state_g, msg, #expr, __FILE__, __LINE__);     \
     return MPTEST__RESULT_FAIL;                                                \
   } while (0)
+
+#define _STRIFY(expr) #expr
 
 /* Used for binary assertions (<, >, <=, >=, ==, !=) in order to format error
  * messages correctly. */
@@ -374,9 +392,9 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 #define _ASSERT_BINOP(lhs, rhs, op)                                            \
   do {                                                                         \
     if (!((lhs)op(rhs))) {                                                     \
-      _ASSERT_FAIL_BEHAVIOR(lhs op rhs, lhs op rhs);                           \
+      _ASSERT_FAIL_BEHAVIOR(lhs op rhs, _STRIFY(lhs op rhs));                  \
     } else {                                                                   \
-      _ASSERT_PASS_BEHAVIOR(lhs op rhs, lhs op rhs);                           \
+      _ASSERT_PASS_BEHAVIOR(lhs op rhs, _STRIFY(lhs op rhs));                  \
     }                                                                          \
   } while (0)
 
@@ -460,6 +478,14 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 #define ASSERT_LT(lhs, rhs) _ASSERT_BINOP(lhs, rhs, <)
 #define ASSERT_GTE(lhs, rhs) _ASSERT_BINOP(lhs, rhs, >=)
 #define ASSERT_LTE(lhs, rhs) _ASSERT_BINOP(lhs, rhs, <=)
+
+#define PROPAGATE(expr)                                                        \
+  do {                                                                         \
+    int _mptest_err = (expr);                                                  \
+    if (_mptest_err != MPTEST__RESULT_PASS) {                                  \
+      return _mptest_err;                                                      \
+    }                                                                          \
+  } while (0)
 
 #if MPTEST_USE_LONGJMP
 
@@ -698,11 +724,15 @@ MPTEST_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
   do {                                                                         \
     mptest_sym_build temp_build;                                               \
     mptest_sym_walk temp_walk;                                                 \
+    int _sym_err;                                                              \
     if (mptest__sym_make_init(                                                 \
             &temp_build, &temp_walk, str, __FILE__, __LINE__, MPTEST_NULL)) {      \
       return MPTEST__RESULT_ERROR;                                             \
     }                                                                          \
-    if (type##_from_sym(&temp_walk, out_var)) {                                \
+    if ((_sym_err = type##_from_sym(&temp_walk, out_var))) {                   \
+      if (_sym_err == SYM_NOMEM) {                                             \
+        return MPTEST__RESULT_PASS;                                            \
+      }                                                                        \
       return MPTEST__RESULT_ERROR;                                             \
     }                                                                          \
     mptest__sym_make_destroy(&temp_build);                                     \
@@ -759,6 +789,7 @@ MPTEST_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
 #define SYM_WRONG_TYPE 6
 #define SYM_NO_MORE 7
 #define SYM_INVALID 8
+#define SYM_NOMEM 9
 
 #endif
 
@@ -766,7 +797,7 @@ MPTEST_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
 
 #if defined(MPTEST_IMPLEMENTATION)
 /* bits/math/implies */
-#define MPTEST__IMPLIES(a, b) (!(a) || b)
+#define MPTEST__IMPLIES(a, b) (!(a) || (b))
 
 /* bits/util/exports */
 #if !defined(MPTEST__SPLIT_BUILD)
@@ -775,7 +806,19 @@ MPTEST_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
 #define MPTEST_INTERNAL extern
 #endif
 
+#if !defined(MPTEST__SPLIT_BUILD)
+#define MPTEST_INTERNAL_DATA_DECL static
 #define MPTEST_INTERNAL_DATA static
+#else
+#define MPTEST_INTERNAL_DATA_DECL extern
+#define MPTEST_INTERNAL_DATA 
+#endif
+
+#if MPTEST_USE_APARSE
+/* bits/util/ntstr/strstr_n */
+MPTEST_INTERNAL const char*
+mptest__strstr_n(const char* s, const char* sub, mptest_size sub_size);
+#endif /* MPTEST_USE_APARSE */
 
 /* bits/util/preproc/token_paste */
 #define MPTEST__PASTE_0(a, b) a ## b
@@ -807,9 +850,10 @@ const mptest_char* mptest__str_get_data(const mptest__str* str);
 int mptest__str_cmp(const mptest__str* str_a, const mptest__str* str_b);
 mptest_size mptest__str_slen(const mptest_char* chars);
 void mptest__str_clear(mptest__str* str);
+void mptest__str_cut_end(mptest__str* str, mptest_size new_size);
 
-#if MPTEST_USE_DYN_ALLOC
 #if MPTEST_USE_SYM
+#if MPTEST_USE_DYN_ALLOC
 /* bits/container/str_view */
 typedef struct mptest__str_view {
     const mptest_char* _data;
@@ -823,13 +867,8 @@ void mptest__str_view_init_null(mptest__str_view* view);
 mptest_size mptest__str_view_size(const mptest__str_view* view);
 const mptest_char* mptest__str_view_get_data(const mptest__str_view* view);
 int mptest__str_view_cmp(const mptest__str_view* a, const mptest__str_view* b);
-#endif /* MPTEST_USE_DYN_ALLOC */
 #endif /* MPTEST_USE_SYM */
-
-#if MPTEST_USE_APARSE
-/* bits/util/ntstr/cmp_n */
-MPTEST_INTERNAL int mptest__scmp_n(const char* a, mptest_size a_size, const char* b);
-#endif /* MPTEST_USE_APARSE */
+#endif /* MPTEST_USE_DYN_ALLOC */
 
 /* bits/util/ntstr/len */
 MPTEST_INTERNAL mptest_size mptest__slen(const mptest_char* s);
@@ -866,8 +905,7 @@ typedef union aparse__arg_contents {
     aparse__arg_pos pos;
 } aparse__arg_contents;
 
-enum aparse__arg_type
-{
+enum aparse__arg_type {
     /* Optional argument (-o, --o) */
     APARSE__ARG_TYPE_OPTIONAL,
     /* Positional argument */
@@ -876,12 +914,15 @@ enum aparse__arg_type
     APARSE__ARG_TYPE_SUBCOMMAND
 };
 
-typedef aparse_error (*aparse__arg_parse_cb)(aparse__arg* arg, aparse__state* state,  mptest_size sub_arg_idx, const char* text, mptest_size text_size);
+typedef aparse_error (*aparse__arg_parse_cb)(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
 typedef void (*aparse__arg_destroy_cb)(aparse__arg* arg);
 
 typedef union aparse__arg_callback_data_2 {
     void* plain;
     aparse_custom_cb custom_cb;
+    int int_val;
 } aparse__arg_callback_data_2;
 
 struct aparse__arg {
@@ -935,10 +976,13 @@ MPTEST_INTERNAL void aparse__state_init_from(aparse__state* state, aparse__state
 #endif
 MPTEST_INTERNAL void aparse__state_init(aparse__state* state);
 MPTEST_INTERNAL void aparse__state_destroy(aparse__state* state);
-MPTEST_INTERNAL void aparse__state_set_out_cb(aparse__state* state, aparse_out_cb out_cb, void* user);
+MPTEST_INTERNAL void aparse__state_set_out_cb(
+  aparse__state* state, aparse_out_cb out_cb, void* user);
 MPTEST_INTERNAL void aparse__state_reset(aparse__state* state);
-MPTEST_INTERNAL aparse_error aparse__state_add_opt(aparse__state* state, char short_opt, const char* long_opt);
-MPTEST_INTERNAL aparse_error aparse__state_add_pos(aparse__state* state, const char* name);
+MPTEST_INTERNAL aparse_error aparse__state_add_opt(
+  aparse__state* state, char short_opt, const char* long_opt);
+MPTEST_INTERNAL aparse_error
+aparse__state_add_pos(aparse__state* state, const char* name);
 MPTEST_INTERNAL aparse_error aparse__state_add_sub(aparse__state* state);
 
 MPTEST_INTERNAL void aparse__state_check_before_add(aparse__state* state);
@@ -946,30 +990,46 @@ MPTEST_INTERNAL void aparse__state_check_before_modify(aparse__state* state);
 MPTEST_INTERNAL void aparse__state_check_before_set_type(aparse__state* state);
 MPTEST_INTERNAL aparse_error aparse__state_flush(aparse__state* state);
 MPTEST_INTERNAL aparse_error aparse__state_out(aparse__state* state, char out);
-MPTEST_INTERNAL aparse_error aparse__state_out_s(aparse__state* state, const char* s);
-MPTEST_INTERNAL aparse_error aparse__state_out_n(aparse__state* state, const char* s, mptest_size n);
+MPTEST_INTERNAL aparse_error
+aparse__state_out_s(aparse__state* state, const char* s);
+MPTEST_INTERNAL aparse_error
+aparse__state_out_n(aparse__state* state, const char* s, mptest_size n);
 
 MPTEST_INTERNAL void aparse__arg_bool_init(aparse__arg* arg, int* out);
-MPTEST_INTERNAL void aparse__arg_str_init(aparse__arg* arg, const char** out, mptest_size* out_size);
+MPTEST_INTERNAL void
+aparse__arg_store_int_init(aparse__arg* arg, int val, int* out);
+MPTEST_INTERNAL void aparse__arg_int_init(aparse__arg* arg, int* out);
+MPTEST_INTERNAL void
+aparse__arg_str_init(aparse__arg* arg, const char** out, mptest_size* out_size);
 MPTEST_INTERNAL void aparse__arg_help_init(aparse__arg* arg);
 MPTEST_INTERNAL void aparse__arg_version_init(aparse__arg* arg);
-MPTEST_INTERNAL void aparse__arg_custom_init(aparse__arg* arg, aparse_custom_cb cb, void* user, aparse_nargs nargs);
+MPTEST_INTERNAL void aparse__arg_custom_init(
+  aparse__arg* arg, aparse_custom_cb cb, void* user, aparse_nargs nargs);
 MPTEST_INTERNAL void aparse__arg_sub_init(aparse__arg* arg);
 
-MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const char* const* argv);
+MPTEST_API aparse_error
+aparse__parse_argv(aparse__state* state, int argc, const char* const* argv);
 
 MPTEST_INTERNAL aparse_error aparse__error_begin(aparse__state* state);
-MPTEST_INTERNAL aparse_error aparse__error_begin_arg(aparse__state* state, const aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__error_unrecognized_arg(aparse__state* state, const char* arg);
-MPTEST_INTERNAL aparse_error aparse__error_quote(aparse__state* state, const char* text, mptest_size text_size);
+MPTEST_INTERNAL aparse_error
+aparse__error_begin_arg(aparse__state* state, const aparse__arg* arg);
+MPTEST_INTERNAL aparse_error
+aparse__error_unrecognized_arg(aparse__state* state, const char* arg);
+MPTEST_INTERNAL aparse_error
+aparse__error_unrecognized_short_arg(aparse__state* state, char short_opt);
+MPTEST_INTERNAL aparse_error
+aparse__error_quote(aparse__state* state, const char* text, mptest_size text_size);
 MPTEST_INTERNAL aparse_error aparse__error_usage(aparse__state* state);
-MPTEST_INTERNAL aparse_error aparse__error_print_short_opt(aparse__state* state, const aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__error_print_long_opt(aparse__state* state, const aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg);
+MPTEST_INTERNAL aparse_error
+aparse__error_print_short_opt(aparse__state* state, const aparse__arg* arg);
+MPTEST_INTERNAL aparse_error
+aparse__error_print_long_opt(aparse__state* state, const aparse__arg* arg);
+MPTEST_INTERNAL aparse_error
+aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg);
 #endif /* MPTEST_USE_APARSE */
 
-#if MPTEST_USE_DYN_ALLOC
 #if MPTEST_USE_SYM
+#if MPTEST_USE_DYN_ALLOC
 /* bits/container/vec */
 #define MPTEST__VEC_TYPE(T) \
     MPTEST__PASTE(T, _vec)
@@ -1259,10 +1319,10 @@ MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, 
     }
 
 #define MPTEST__VEC_DECL_get_data(T) \
-    const T* MPTEST__VEC_IDENT(T, get_data)(const MPTEST__VEC_TYPE(T)* vec)
+    T* MPTEST__VEC_IDENT(T, get_data)(MPTEST__VEC_TYPE(T)* vec)
 
 #define MPTEST__VEC_IMPL_get_data(T) \
-    const T* MPTEST__VEC_IDENT(T, get_data)(const MPTEST__VEC_TYPE(T)* vec) { \
+    T* MPTEST__VEC_IDENT(T, get_data)(MPTEST__VEC_TYPE(T)* vec) { \
         return vec->_data; \
     }
 
@@ -1285,8 +1345,8 @@ MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, 
         MPTEST__VEC_SETSIZE(T, vec, cap); \
         return 0; \
     }
-#endif /* MPTEST_USE_DYN_ALLOC */
 #endif /* MPTEST_USE_SYM */
+#endif /* MPTEST_USE_DYN_ALLOC */
 
 /* mptest */
 #ifndef MPTEST_INTERNAL_H
@@ -1643,6 +1703,29 @@ MPTEST_INTERNAL int mptest__sym_parse_do(
 
 #endif /* MPTEST_IMPLEMENTATION */
 #if defined(MPTEST_IMPLEMENTATION)
+#if MPTEST_USE_APARSE
+/* bits/util/ntstr/strstr_n */
+MPTEST_INTERNAL const char*
+mptest__strstr_n(const char* s, const char* sub, mptest_size sub_size) {
+    while (*s) {
+        const char* sa = s;
+        mptest_size pos = 0;
+        while (*sa && (pos != sub_size)) {
+            if (*sa != sub[pos]) {
+                break;
+            }
+            sa++;
+            pos++;
+        }
+        if (pos == sub_size) {
+            return s;
+        }
+        s++;
+    }
+    return MPTEST_NULL;
+}
+#endif /* MPTEST_USE_APARSE */
+
 /* bits/types/char */
 MPTEST__STATIC_ASSERT(mptest__char_is_one_byte, sizeof(mptest_char) == 1);
 
@@ -1901,24 +1984,28 @@ void mptest__str_init_move(mptest__str* str, mptest__str* old) {
 int mptest__str_cmp(const mptest__str* str_a, const mptest__str* str_b) {
     mptest_size a_len = mptest__str_size(str_a);
     mptest_size b_len = mptest__str_size(str_b);
+    mptest_size i = 0;
     const mptest_char* a_data = mptest__str_get_data(str_a);
     const mptest_char* b_data = mptest__str_get_data(str_b);
-    mptest_size i;
-    if (a_len < b_len) {
-        return -1;
-    } else if (a_len > b_len) {
-        return 1;
+    while (1) {
+        if (i == a_len || i == b_len) {
+            break;
+        }
+        if (a_data[i] < b_data[i]) {
+            return -1;
+        } else if (a_data[i] > b_data[i]) {
+            return 1;
+        }
+        i++;
     }
-    for (i = 0; i < a_len; i++) {
-        if (a_data[i] != b_data[i]) {
-            if (a_data[i] < b_data[i]) {
-                return -1;
-            } else {
-                return 1;
-            }
+    if (i == a_len) {
+        if (i == b_len) {
+            return 0;
+        } else {
+            return -1;
         }
     }
-    return 0;
+    return 1;
 }
 
 void mptest__str_clear(mptest__str* str) {
@@ -1926,8 +2013,14 @@ void mptest__str_clear(mptest__str* str) {
     MPTEST__STR_DATA(str)[0] = '\0';
 }
 
-#if MPTEST_USE_DYN_ALLOC
+void mptest__str_cut_end(mptest__str* str, mptest_size new_size) {
+    MPTEST_ASSERT(new_size <= MPTEST__STR_GET_SIZE(str));
+    MPTEST__STR_SET_SIZE(str, new_size);
+    MPTEST__STR_DATA(str)[new_size] = '\0';
+}
+
 #if MPTEST_USE_SYM
+#if MPTEST_USE_DYN_ALLOC
 /* bits/container/str_view */
 void mptest__str_view_init(mptest__str_view* view, const mptest__str* other) {
     view->_size = mptest__str_size(other);
@@ -1979,8 +2072,8 @@ int mptest__str_view_cmp(const mptest__str_view* view_a, const mptest__str_view*
     }
     return 0;
 }
-#endif /* MPTEST_USE_DYN_ALLOC */
 #endif /* MPTEST_USE_SYM */
+#endif /* MPTEST_USE_DYN_ALLOC */
 
 #if MPTEST_USE_SYM
 /* bits/types/fixed/int32 */
@@ -1988,31 +2081,6 @@ int mptest__str_view_cmp(const mptest__str_view* view_a, const mptest__str_view*
  * that is 32 bits wide. */
 MPTEST__STATIC_ASSERT(mptest__int32_is_4_bytes, sizeof(mptest_int32) == 4);
 #endif /* MPTEST_USE_SYM */
-
-#if MPTEST_USE_APARSE
-/* bits/util/ntstr/cmp_n */
-MPTEST_INTERNAL int mptest__scmp_n(const char* a, mptest_size a_size, const char* b)
-{
-    mptest_size a_pos = 0;
-    while (1) {
-        if (a_pos == a_size) {
-            if (*b != '\0') {
-                return 0;
-            } else {
-                /* *b equals '\0' or '=' */
-                return 1;
-            }
-        }
-        if (*b == '\0' || a[a_pos] != *b) {
-            /* b ended first or a and b do not match */
-            return 0;
-        }
-        a_pos++;
-        b++;
-    }
-    return 0;
-}
-#endif /* MPTEST_USE_APARSE */
 
 /* bits/util/ntstr/len */
 MPTEST_INTERNAL mptest_size mptest__slen(const mptest_char* s) {
@@ -2033,7 +2101,7 @@ MPTEST_API aparse_error aparse_init(aparse_state* state) {
     }
     aparse__state_init(state->state);
     state->state->root = MPTEST_MALLOC(sizeof(aparse__state_root));
-        if (state->state->root == MPTEST_NULL) {
+    if (state->state->root == MPTEST_NULL) {
         return APARSE_ERROR_NOMEM;
     }
     state->state->root->out_buf_ptr = 0;
@@ -2050,11 +2118,13 @@ MPTEST_API void aparse_destroy(aparse_state* state) {
     }
 }
 
-MPTEST_API void aparse_set_out_cb(aparse_state* state, aparse_out_cb out_cb, void* user) {
+MPTEST_API void
+aparse_set_out_cb(aparse_state* state, aparse_out_cb out_cb, void* user) {
     aparse__state_set_out_cb(state->state, out_cb, user);
 }
 
-MPTEST_API aparse_error aparse_add_opt(aparse_state* state, char short_opt, const char* long_opt) {
+MPTEST_API aparse_error
+aparse_add_opt(aparse_state* state, char short_opt, const char* long_opt) {
     aparse__state_check_before_add(state->state);
     return aparse__state_add_opt(state->state, short_opt, long_opt);
 }
@@ -2090,7 +2160,18 @@ MPTEST_API void aparse_arg_type_bool(aparse_state* state, int* out) {
     aparse__arg_bool_init(state->state->tail, out);
 }
 
-MPTEST_API void aparse_arg_type_str(aparse_state* state, const char** out, mptest_size* out_size) {
+MPTEST_API void aparse_arg_type_store_int(aparse_state* state, int val, int* out) {
+    aparse__state_check_before_set_type(state->state);
+    aparse__arg_store_int_init(state->state->tail, val, out);
+}
+
+MPTEST_API void aparse_arg_type_int(aparse_state* state, int* out) {
+    aparse__state_check_before_set_type(state->state);
+    aparse__arg_int_init(state->state->tail, out);
+}
+
+MPTEST_API void
+aparse_arg_type_str(aparse_state* state, const char** out, mptest_size* out_size) {
     aparse__state_check_before_set_type(state->state);
     aparse__arg_str_init(state->state->tail, out, out_size);
 }
@@ -2105,18 +2186,21 @@ MPTEST_API void aparse_arg_type_version(aparse_state* state) {
     aparse__arg_version_init(state->state->tail);
 }
 
-MPTEST_API void aparse_arg_type_custom(aparse_state* state, aparse_custom_cb cb, void* user, aparse_nargs nargs) {
+MPTEST_API void aparse_arg_type_custom(
+  aparse_state* state, aparse_custom_cb cb, void* user, aparse_nargs nargs) {
     aparse__state_check_before_set_type(state->state);
     aparse__arg_custom_init(state->state->tail, cb, user, nargs);
 }
 
-MPTEST_API aparse_error aparse_parse(aparse_state* state, int argc, const char* const* argv) {
+MPTEST_API aparse_error
+aparse_parse(aparse_state* state, int argc, const char* const* argv) {
     aparse_error err = APARSE_ERROR_NONE;
     if (argc == 0) {
         return APARSE_ERROR_INVALID;
     } else {
         state->state->root->prog_name = argv[0];
-        state->state->root->prog_name_size = mptest__slen(state->state->root->prog_name);
+        state->state->root->prog_name_size =
+          mptest__slen(state->state->root->prog_name);
         err = aparse__parse_argv(state->state, argc - 1, argv + 1);
         if (err == APARSE_ERROR_PARSE) {
             if ((err = aparse__state_flush(state->state))) {
@@ -2140,14 +2224,17 @@ MPTEST_API aparse_error aparse_parse(aparse_state* state, int argc, const char* 
 MPTEST_INTERNAL void aparse__arg_init(aparse__arg* arg) {
     arg->type = 0;
     arg->help = MPTEST_NULL;
+    arg->help_size = 0;
     arg->metavar = MPTEST_NULL;
-    arg->callback = MPTEST_NULL;
-    arg->callback_data = MPTEST_NULL;
-    arg->callback_data_2.plain = MPTEST_NULL;
+    arg->metavar_size = 0;
     arg->nargs = 0;
     arg->required = 0;
     arg->was_specified = 0;
     arg->next = MPTEST_NULL;
+    arg->callback = MPTEST_NULL;
+    arg->destroy = MPTEST_NULL;
+    arg->callback_data = MPTEST_NULL;
+    arg->callback_data_2.plain = MPTEST_NULL;
 }
 
 MPTEST_INTERNAL void aparse__arg_destroy(aparse__arg* arg) {
@@ -2157,7 +2244,9 @@ MPTEST_INTERNAL void aparse__arg_destroy(aparse__arg* arg) {
 }
 
 MPTEST_INTERNAL void aparse__arg_bool_destroy(aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__arg_bool_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size);
+MPTEST_INTERNAL aparse_error aparse__arg_bool_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
 
 MPTEST_INTERNAL void aparse__arg_bool_init(aparse__arg* arg, int* out) {
     arg->nargs = APARSE_NARGS_0_OR_1_EQ;
@@ -2170,7 +2259,9 @@ MPTEST_INTERNAL void aparse__arg_bool_destroy(aparse__arg* arg) {
     MPTEST__UNUSED(arg);
 }
 
-MPTEST_INTERNAL aparse_error aparse__arg_bool_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size) {
+MPTEST_INTERNAL aparse_error aparse__arg_bool_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size) {
     aparse_error err = APARSE_ERROR_NONE;
     int* out = (int*)arg->callback_data;
     MPTEST__UNUSED(state);
@@ -2188,7 +2279,61 @@ MPTEST_INTERNAL aparse_error aparse__arg_bool_cb(aparse__arg* arg, aparse__state
         if ((err = aparse__error_begin_arg(state, arg))) {
             return err;
         }
-        if ((err = aparse__state_out_s(state, "invalid value for boolean flag: "))) {
+        if ((err = aparse__state_out_s(
+               state, "invalid value for boolean flag: "))) {
+            return err;
+        }
+        if ((err = aparse__error_quote(state, text, text_size))) {
+            return err;
+        }
+        if ((err = aparse__state_out(state, '\n'))) {
+            return err;
+        }
+        return APARSE_ERROR_PARSE;
+    }
+}
+
+MPTEST_INTERNAL void aparse__arg_store_int_destroy(aparse__arg* arg);
+MPTEST_INTERNAL aparse_error aparse__arg_store_int_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
+
+MPTEST_INTERNAL void
+aparse__arg_store_int_init(aparse__arg* arg, int val, int* out) {
+    MPTEST_ASSERT(out != MPTEST_NULL);
+    arg->nargs = APARSE_NARGS_0_OR_1_EQ;
+    arg->callback = aparse__arg_store_int_cb;
+    arg->callback_data = (void*)out;
+    arg->callback_data_2.int_val = val;
+    arg->destroy = aparse__arg_store_int_destroy;
+}
+
+MPTEST_INTERNAL void aparse__arg_store_int_destroy(aparse__arg* arg) {
+    MPTEST__UNUSED(arg);
+}
+
+MPTEST_INTERNAL aparse_error aparse__arg_store_int_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size) {
+    aparse_error err = APARSE_ERROR_NONE;
+    int* out = (int*)arg->callback_data;
+    MPTEST__UNUSED(state);
+    MPTEST__UNUSED(sub_arg_idx);
+    if (text == MPTEST_NULL) {
+        *out = arg->callback_data_2.int_val;
+        return APARSE_ERROR_NONE;
+    } else if (text_size == 1 && *text == '0') {
+        /* don't store anything */
+        return APARSE_ERROR_NONE;
+    } else if (text_size == 1 && *text == '1') {
+        *out = arg->callback_data_2.int_val;
+        return APARSE_ERROR_NONE;
+    } else {
+        if ((err = aparse__error_begin_arg(state, arg))) {
+            return err;
+        }
+        if ((err = aparse__state_out_s(
+               state, "invalid value for boolean flag: "))) {
             return err;
         }
         if ((err = aparse__error_quote(state, text, text_size))) {
@@ -2202,9 +2347,12 @@ MPTEST_INTERNAL aparse_error aparse__arg_bool_cb(aparse__arg* arg, aparse__state
 }
 
 MPTEST_INTERNAL void aparse__arg_str_destroy(aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__arg_str_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size);
+MPTEST_INTERNAL aparse_error aparse__arg_str_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
 
-MPTEST_INTERNAL void aparse__arg_str_init(aparse__arg* arg, const char** out, mptest_size* out_size) {
+MPTEST_INTERNAL void
+aparse__arg_str_init(aparse__arg* arg, const char** out, mptest_size* out_size) {
     MPTEST_ASSERT(out != MPTEST_NULL);
     arg->nargs = 1;
     arg->callback = aparse__arg_str_cb;
@@ -2213,11 +2361,11 @@ MPTEST_INTERNAL void aparse__arg_str_init(aparse__arg* arg, const char** out, mp
     arg->destroy = aparse__arg_str_destroy;
 }
 
-MPTEST_INTERNAL void aparse__arg_str_destroy(aparse__arg* arg) {
-    MPTEST__UNUSED(arg);
-}
+MPTEST_INTERNAL void aparse__arg_str_destroy(aparse__arg* arg) { MPTEST__UNUSED(arg); }
 
-MPTEST_INTERNAL aparse_error aparse__arg_str_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size) {
+MPTEST_INTERNAL aparse_error aparse__arg_str_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size) {
     const char** out = (const char**)arg->callback_data;
     mptest_size* out_size = (mptest_size*)arg->callback_data_2.plain;
     MPTEST_ASSERT(text != MPTEST_NULL);
@@ -2230,8 +2378,70 @@ MPTEST_INTERNAL aparse_error aparse__arg_str_cb(aparse__arg* arg, aparse__state*
     return APARSE_ERROR_NONE;
 }
 
+MPTEST_INTERNAL void aparse__arg_int_destroy(aparse__arg* arg);
+MPTEST_INTERNAL aparse_error aparse__arg_int_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
+
+MPTEST_INTERNAL void aparse__arg_int_init(aparse__arg* arg, int* out) {
+    arg->nargs = 1;
+    arg->callback = aparse__arg_int_cb;
+    arg->callback_data = (void*)out;
+    arg->destroy = aparse__arg_int_destroy;
+}
+
+#define APARSE__ARG_INT_MAX 9999999
+#define APARSE__ARG_INT_SIZE_MAX 7
+
+MPTEST_INTERNAL aparse_error aparse__arg_int_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size) {
+    aparse_error err = APARSE_ERROR_NONE;
+    const char* end = text + text_size;
+    int acc = 0;
+    int n = 0;
+    MPTEST__UNUSED(sub_arg_idx);
+    while (text < end) {
+        if (n == APARSE__ARG_INT_SIZE_MAX) {
+            goto error;
+        }
+        if (acc > APARSE__ARG_INT_MAX) {
+            goto error;
+        }
+        if (*text >= '0' && *text <= '9') {
+            acc *= 10;
+            acc += *text - '0';
+        } else {
+            goto error;
+        }
+        text++;
+        n++;
+    }
+    *((int*)arg->callback_data) = acc;
+    return APARSE_ERROR_NONE;
+error:
+    if ((err = aparse__error_begin_arg(state, arg))) {
+        return err;
+    }
+    if ((err =
+           aparse__state_out_s(state, "invalid value for integer option: "))) {
+        return err;
+    }
+    if ((err = aparse__error_quote(state, text, text_size))) {
+        return err;
+    }
+    if ((err = aparse__state_out(state, '\n'))) {
+        return err;
+    }
+    return APARSE_ERROR_PARSE;
+}
+
+MPTEST_INTERNAL void aparse__arg_int_destroy(aparse__arg* arg) { MPTEST__UNUSED(arg); }
+
 MPTEST_INTERNAL void aparse__arg_help_destroy(aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size);
+MPTEST_INTERNAL aparse_error aparse__arg_help_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
 
 MPTEST_INTERNAL void aparse__arg_help_init(aparse__arg* arg) {
     arg->nargs = 0;
@@ -2243,7 +2453,9 @@ MPTEST_INTERNAL void aparse__arg_help_destroy(aparse__arg* arg) {
     MPTEST__UNUSED(arg);
 }
 
-MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size) {
+MPTEST_INTERNAL aparse_error aparse__arg_help_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size) {
     aparse_error err = APARSE_ERROR_NONE;
     MPTEST__UNUSED(arg);
     MPTEST__UNUSED(sub_arg_idx);
@@ -2261,7 +2473,8 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
                 continue;
             }
             if (!has_printed_header) {
-                if ((err = aparse__state_out_s(state, "\npositional arguments:\n"))) {
+                if ((err = aparse__state_out_s(
+                       state, "\npositional arguments:\n"))) {
                     return err;
                 }
                 has_printed_header = 1;
@@ -2270,11 +2483,14 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
                 return err;
             }
             if (cur->metavar == MPTEST_NULL) {
-                if ((err = aparse__state_out_n(state, cur->contents.pos.name, cur->contents.pos.name_size))) {
+                if ((err = aparse__state_out_n(
+                       state, cur->contents.pos.name,
+                       cur->contents.pos.name_size))) {
                     return err;
                 }
             } else {
-                if ((err = aparse__state_out_n(state, cur->metavar, cur->metavar_size))) {
+                if ((err = aparse__state_out_n(
+                       state, cur->metavar, cur->metavar_size))) {
                     return err;
                 }
             }
@@ -2285,7 +2501,8 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
                 if ((err = aparse__state_out_s(state, "    "))) {
                     return err;
                 }
-                if ((err = aparse__state_out_n(state, cur->help, cur->help_size))) {
+                if ((err = aparse__state_out_n(
+                       state, cur->help, cur->help_size))) {
                     return err;
                 }
                 if ((err = aparse__state_out(state, '\n'))) {
@@ -2304,7 +2521,8 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
                 continue;
             }
             if (!has_printed_header) {
-                if ((err = aparse__state_out_s(state, "\noptional arguments:\n"))) {
+                if ((err = aparse__state_out_s(
+                       state, "\noptional arguments:\n"))) {
                     return err;
                 }
                 has_printed_header = 1;
@@ -2316,8 +2534,7 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
                 if ((err = aparse__error_print_short_opt(state, cur))) {
                     return err;
                 }
-                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ &&
-                    cur->nargs != 0) {
+                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ && cur->nargs != 0) {
                     if ((err = aparse__state_out(state, ' '))) {
                         return err;
                     }
@@ -2335,8 +2552,7 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
                 if ((err = aparse__error_print_long_opt(state, cur))) {
                     return err;
                 }
-                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ &&
-                    cur->nargs != 0) {
+                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ && cur->nargs != 0) {
                     if ((err = aparse__state_out(state, ' '))) {
                         return err;
                     }
@@ -2352,7 +2568,8 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
                 if ((err = aparse__state_out_s(state, "    "))) {
                     return err;
                 }
-                if ((err = aparse__state_out_n(state, cur->help, cur->help_size))) {
+                if ((err = aparse__state_out_n(
+                       state, cur->help, cur->help_size))) {
                     return err;
                 }
                 if ((err = aparse__state_out(state, '\n'))) {
@@ -2366,7 +2583,9 @@ MPTEST_INTERNAL aparse_error aparse__arg_help_cb(aparse__arg* arg, aparse__state
 }
 
 MPTEST_INTERNAL void aparse__arg_version_destroy(aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__arg_version_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size);
+MPTEST_INTERNAL aparse_error aparse__arg_version_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
 
 MPTEST_INTERNAL void aparse__arg_version_init(aparse__arg* arg) {
     arg->nargs = 0;
@@ -2378,7 +2597,9 @@ MPTEST_INTERNAL void aparse__arg_version_destroy(aparse__arg* arg) {
     MPTEST__UNUSED(arg);
 }
 
-MPTEST_INTERNAL aparse_error aparse__arg_version_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size) {
+MPTEST_INTERNAL aparse_error aparse__arg_version_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size) {
     aparse_error err = APARSE_ERROR_NONE;
     MPTEST__UNUSED(arg);
     MPTEST__UNUSED(sub_arg_idx);
@@ -2392,9 +2613,12 @@ MPTEST_INTERNAL aparse_error aparse__arg_version_cb(aparse__arg* arg, aparse__st
 }
 
 MPTEST_INTERNAL void aparse__arg_custom_destroy(aparse__arg* arg);
-MPTEST_INTERNAL aparse_error aparse__arg_custom_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size);
+MPTEST_INTERNAL aparse_error aparse__arg_custom_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size);
 
-MPTEST_INTERNAL void aparse__arg_custom_init(aparse__arg* arg, aparse_custom_cb cb, void* user, aparse_nargs nargs) {
+MPTEST_INTERNAL void aparse__arg_custom_init(
+  aparse__arg* arg, aparse_custom_cb cb, void* user, aparse_nargs nargs) {
     arg->nargs = nargs;
     arg->callback = aparse__arg_custom_cb;
     arg->callback_data = (void*)user;
@@ -2406,7 +2630,9 @@ MPTEST_INTERNAL void aparse__arg_custom_destroy(aparse__arg* arg) {
     MPTEST__UNUSED(arg);
 }
 
-MPTEST_INTERNAL aparse_error aparse__arg_custom_cb(aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx, const char* text, mptest_size text_size) {
+MPTEST_INTERNAL aparse_error aparse__arg_custom_cb(
+  aparse__arg* arg, aparse__state* state, mptest_size sub_arg_idx,
+  const char* text, mptest_size text_size) {
     aparse_custom_cb cb = (aparse_custom_cb)arg->callback_data_2.custom_cb;
     aparse_state state_;
     state_.state = state;
@@ -2438,7 +2664,8 @@ MPTEST_INTERNAL void aparse__arg_sub_destroy(aparse__arg* arg) {
 /* aparse */
 MPTEST_INTERNAL aparse_error aparse__error_begin_progname(aparse__state* state) {
     aparse_error err = APARSE_ERROR_NONE;
-    if ((err = aparse__state_out_n(state, state->root->prog_name, state->root->prog_name_size))) {
+    if ((err = aparse__state_out_n(
+           state, state->root->prog_name, state->root->prog_name_size))) {
         return err;
     }
     if ((err = aparse__state_out_s(state, ": "))) {
@@ -2458,7 +2685,8 @@ MPTEST_INTERNAL aparse_error aparse__error_begin(aparse__state* state) {
     return err;
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_print_short_opt(aparse__state* state, const aparse__arg* arg) {
+MPTEST_INTERNAL aparse_error
+aparse__error_print_short_opt(aparse__state* state, const aparse__arg* arg) {
     aparse_error err = APARSE_ERROR_NONE;
     MPTEST_ASSERT(arg->contents.opt.short_opt);
     if ((err = aparse__state_out(state, '-'))) {
@@ -2470,19 +2698,23 @@ MPTEST_INTERNAL aparse_error aparse__error_print_short_opt(aparse__state* state,
     return err;
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_print_long_opt(aparse__state* state, const aparse__arg* arg) {
+MPTEST_INTERNAL aparse_error
+aparse__error_print_long_opt(aparse__state* state, const aparse__arg* arg) {
     aparse_error err = APARSE_ERROR_NONE;
     MPTEST_ASSERT(arg->contents.opt.long_opt);
     if ((err = aparse__state_out_s(state, "--"))) {
         return err;
     }
-    if ((err = aparse__state_out_n(state, arg->contents.opt.long_opt, arg->contents.opt.long_opt_size))) {
+    if ((err = aparse__state_out_n(
+           state, arg->contents.opt.long_opt,
+           arg->contents.opt.long_opt_size))) {
         return err;
     }
     return err;
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_begin_opt(aparse__state* state, const aparse__arg* arg) {
+MPTEST_INTERNAL aparse_error
+aparse__error_begin_opt(aparse__state* state, const aparse__arg* arg) {
     aparse_error err = APARSE_ERROR_NONE;
     MPTEST_ASSERT(arg->type == APARSE__ARG_TYPE_OPTIONAL);
     if ((err = aparse__error_begin(state))) {
@@ -2512,7 +2744,8 @@ MPTEST_INTERNAL aparse_error aparse__error_begin_opt(aparse__state* state, const
     return err;
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_begin_pos(aparse__state* state, const aparse__arg* arg) {
+MPTEST_INTERNAL aparse_error
+aparse__error_begin_pos(aparse__state* state, const aparse__arg* arg) {
     aparse_error err = APARSE_ERROR_NONE;
     MPTEST_ASSERT(arg->type == APARSE__ARG_TYPE_POSITIONAL);
     if ((err = aparse__error_begin(state))) {
@@ -2521,7 +2754,8 @@ MPTEST_INTERNAL aparse_error aparse__error_begin_pos(aparse__state* state, const
     if ((err = aparse__state_out_s(state, "argument "))) {
         return err;
     }
-    if ((err = aparse__state_out_n(state, arg->contents.pos.name, arg->contents.pos.name_size))) {
+    if ((err = aparse__state_out_n(
+           state, arg->contents.pos.name, arg->contents.pos.name_size))) {
         return err;
     }
     if ((err = aparse__state_out_s(state, ": "))) {
@@ -2530,7 +2764,8 @@ MPTEST_INTERNAL aparse_error aparse__error_begin_pos(aparse__state* state, const
     return err;
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_begin_arg(aparse__state* state, const aparse__arg* arg) {
+MPTEST_INTERNAL aparse_error
+aparse__error_begin_arg(aparse__state* state, const aparse__arg* arg) {
     if (arg->type == APARSE__ARG_TYPE_OPTIONAL) {
         return aparse__error_begin_opt(state, arg);
     } else {
@@ -2538,21 +2773,15 @@ MPTEST_INTERNAL aparse_error aparse__error_begin_arg(aparse__state* state, const
     }
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_unrecognized_arg(aparse__state* state, const char* arg) {
-    aparse_error err = APARSE_ERROR_NONE;
-    if ((err = aparse__error_begin(state))) {
-        return err;
+MPTEST_INTERNAL int
+aparse__error_should_quote(const char* text, mptest_size text_size) {
+    mptest_size i;
+    for (i = 0; i < text_size; i++) {
+        if (text[i] < ' ') {
+            return 1;
+        }
     }
-    if ((err = aparse__state_out_s(state, "unrecognized argument: "))) {
-        return err;
-    }
-    if ((err = aparse__state_out_s(state, arg))) {
-        return err;
-    }
-    if ((err = aparse__state_out(state, '\n'))) {
-        return err;
-    }
-    return err;
+    return 0;
 }
 
 MPTEST_INTERNAL char aparse__hexdig(unsigned char c) {
@@ -2563,7 +2792,32 @@ MPTEST_INTERNAL char aparse__hexdig(unsigned char c) {
     }
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_quote(aparse__state* state, const char* text, mptest_size text_size) {
+MPTEST_INTERNAL aparse_error
+aparse__error_quote_one(aparse__state* state, char c) {
+    aparse_error err = APARSE_ERROR_NONE;
+    if (c < ' ') {
+        if ((err = aparse__state_out(state, '\\'))) {
+            return err;
+        }
+        if ((err = aparse__state_out(state, 'x'))) {
+            return err;
+        }
+        if ((err = aparse__state_out(state, aparse__hexdig((c >> 4) & 0xF)))) {
+            return err;
+        }
+        if ((err = aparse__state_out(state, aparse__hexdig(c & 0xF)))) {
+            return err;
+        }
+    } else {
+        if ((err = aparse__state_out(state, c))) {
+            return err;
+        }
+    }
+    return err;
+}
+
+MPTEST_INTERNAL aparse_error aparse__error_quote(
+  aparse__state* state, const char* text, mptest_size text_size) {
     aparse_error err = APARSE_ERROR_NONE;
     mptest_size i;
     if ((err = aparse__state_out(state, '"'))) {
@@ -2571,26 +2825,68 @@ MPTEST_INTERNAL aparse_error aparse__error_quote(aparse__state* state, const cha
     }
     for (i = 0; i < text_size; i++) {
         char c = text[i];
-        if (c < ' ') {
-            if ((err = aparse__state_out(state, '\\'))) {
-                return err;
-            }
-            if ((err = aparse__state_out(state, 'x'))) {
-                return err;
-            }
-            if ((err = aparse__state_out(state, aparse__hexdig((c >> 4) & 0xF)))) {
-                return err;
-            }
-            if ((err = aparse__state_out(state, aparse__hexdig(c & 0xF)))) {
-                return err;
-            }
-        } else {
-            if ((err = aparse__state_out(state, c))) {
-                return err;
-            }
+        if ((err = aparse__error_quote_one(state, c))) {
+            return err;
         }
     }
     if ((err = aparse__state_out(state, '"'))) {
+        return err;
+    }
+    return err;
+}
+
+MPTEST_INTERNAL aparse_error
+aparse__error_unrecognized_arg(aparse__state* state, const char* arg) {
+    aparse_error err = APARSE_ERROR_NONE;
+    if ((err = aparse__error_begin(state))) {
+        return err;
+    }
+    if ((err = aparse__state_out_s(state, "unrecognized argument: "))) {
+        return err;
+    }
+    if (aparse__error_should_quote(arg, mptest__slen(arg))) {
+        if ((err = aparse__error_quote(state, arg, mptest__slen(arg)))) {
+            return err;
+        }
+    } else {
+        if ((err = aparse__state_out_s(state, arg))) {
+            return err;
+        }
+    }
+    if ((err = aparse__state_out(state, '\n'))) {
+        return err;
+    }
+    return err;
+}
+
+MPTEST_INTERNAL aparse_error
+aparse__error_unrecognized_short_arg(aparse__state* state, char short_opt) {
+    aparse_error err = APARSE_ERROR_NONE;
+    if ((err = aparse__error_begin(state))) {
+        return err;
+    }
+    if ((err = aparse__state_out_s(state, "unrecognized argument: "))) {
+        return err;
+    }
+    if (aparse__error_should_quote(&short_opt, 1) || short_opt == ' ') {
+        if ((err = aparse__state_out_n(state, "\"-", 2))) {
+            return err;
+        }
+        if ((err = aparse__error_quote_one(state, short_opt))) {
+            return err;
+        }
+        if ((err = aparse__state_out_n(state, "\"", 1))) {
+            return err;
+        }
+    } else {
+        if ((err = aparse__state_out_n(state, "-", 1))) {
+            return err;
+        }
+        if ((err = aparse__state_out_n(state, &short_opt, 1))) {
+            return err;
+        }
+    }
+    if ((err = aparse__state_out(state, '\n'))) {
         return err;
     }
     return err;
@@ -2612,7 +2908,8 @@ int aparse__error_can_coalesce_in_usage(const aparse__arg* arg) {
     return 1;
 }
 
-MPTEST_INTERNAL aparse_error aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg) {
+MPTEST_INTERNAL aparse_error
+aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg) {
     aparse_error err = APARSE_ERROR_NONE;
     const char* var;
     mptest_size var_size;
@@ -2690,7 +2987,8 @@ MPTEST_INTERNAL aparse_error aparse__error_usage(aparse__state* state) {
     if ((err = aparse__state_out_s(state, "usage: "))) {
         return err;
     }
-    if ((err = aparse__state_out_n(state, state->root->prog_name, state->root->prog_name_size))) {
+    if ((err = aparse__state_out_n(
+           state, state->root->prog_name, state->root->prog_name_size))) {
         return err;
     }
     /* print coalesced args */
@@ -2702,7 +3000,8 @@ MPTEST_INTERNAL aparse_error aparse__error_usage(aparse__state* state) {
                 }
                 has_printed = 1;
             }
-            if ((err = aparse__state_out(state, cur->contents.opt.short_opt))) {
+            if ((err =
+                   aparse__state_out(state, cur->contents.opt.short_opt))) {
                 return err;
             }
         }
@@ -2735,8 +3034,7 @@ MPTEST_INTERNAL aparse_error aparse__error_usage(aparse__state* state) {
                         return err;
                     }
                 }
-                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ &&
-                    cur->nargs != 0) {
+                if (cur->nargs != APARSE_NARGS_0_OR_1_EQ && cur->nargs != 0) {
                     if ((err = aparse__state_out(state, ' '))) {
                         return err;
                     }
@@ -3187,22 +3485,22 @@ MPTEST_INTERNAL aparse_error aparse__state_out_n(aparse__state* state, const cha
 #if MPTEST_USE_APARSE
 /* aparse */
 /* accepts an lvalue */
-#define APARSE__NEXT_POSITIONAL(n) \
-    while ((n) != MPTEST_NULL && (n)->type != APARSE__ARG_TYPE_POSITIONAL) { \
-        (n) = (n)->next; \
+#define APARSE__NEXT_POSITIONAL(n)                                            \
+    while ((n) != MPTEST_NULL && (n)->type != APARSE__ARG_TYPE_POSITIONAL) {      \
+        (n) = (n)->next;                                                      \
     }
 
 int aparse__is_positional(const char* arg_text) {
-    return (arg_text[0] == '\0') /* empty string */
-            || (arg_text[0] == '-' && arg_text[1] == '\0') /* just a dash */
-            || (arg_text[0] == '-' && arg_text[1] == '-' && arg_text[2] == '\0') /* two dashes */
-            || (arg_text[0] != '-'); /* all positionals */
+    return (arg_text[0] == '\0')                          /* empty string */
+           || (arg_text[0] == '-' && arg_text[1] == '\0') /* just a dash */
+           || (arg_text[0] == '-' && arg_text[1] == '-' &&
+               arg_text[2] == '\0') /* two dashes */
+           || (arg_text[0] != '-'); /* all positionals */
 }
 
 /* Returns NULL if the option does not match. */
-const char* aparse__arg_match_long_opt(const struct aparse__arg* opt,
-    const char* arg_without_dashes)
-{
+const char* aparse__arg_match_long_opt(
+  const struct aparse__arg* opt, const char* arg_without_dashes) {
     mptest_size a_pos = 0;
     const char* a_str = opt->contents.opt.long_opt;
     const char* b = arg_without_dashes;
@@ -3225,7 +3523,8 @@ const char* aparse__arg_match_long_opt(const struct aparse__arg* opt,
     return NULL;
 }
 
-MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const char* const* argv) {
+MPTEST_API aparse_error
+aparse__parse_argv(aparse__state* state, int argc, const char* const* argv) {
     aparse_error err = APARSE_ERROR_NONE;
     int argc_idx = 0;
     aparse__arg* next_positional = state->head;
@@ -3242,7 +3541,8 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                 return APARSE_ERROR_PARSE;
             }
             arg_text_size = mptest__slen((const mptest_char*)arg_text);
-            if ((err = next_positional->callback(next_positional, state, 0, arg_text, arg_text_size))) {
+            if ((err = next_positional->callback(
+                   next_positional, state, 0, arg_text, arg_text_size))) {
                 return err;
             }
             APARSE__NEXT_POSITIONAL(next_positional);
@@ -3272,7 +3572,8 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                         arg = arg->next;
                     }
                     if (arg == MPTEST_NULL) {
-                        if ((err = aparse__error_unrecognized_arg(state, arg_text))) {
+                        if ((err = aparse__error_unrecognized_short_arg(
+                               state, short_opt))) {
                             return err;
                         }
                         return APARSE_ERROR_PARSE;
@@ -3286,12 +3587,17 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                         if (arg->type == APARSE__ARG_TYPE_OPTIONAL) {
                             if (arg->contents.opt.long_opt != MPTEST_NULL) {
                                 mptest_size opt_pos = 0;
-                                const char* opt_ptr = arg->contents.opt.long_opt;
+                                const char* opt_ptr =
+                                  arg->contents.opt.long_opt;
                                 const char* arg_ptr = arg_end;
                                 int found = 0;
                                 while (1) {
-                                    if (opt_pos == arg->contents.opt.long_opt_size) {
-                                        if (*arg_ptr != '\0' && *arg_ptr != '=') {
+                                    if (
+                                      opt_pos ==
+                                      arg->contents.opt.long_opt_size) {
+                                        if (
+                                          *arg_ptr != '\0' &&
+                                          *arg_ptr != '=') {
                                             break;
                                         } else {
                                             /* *b equals '\0' or '=' */
@@ -3300,8 +3606,11 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                                             break;
                                         }
                                     }
-                                    if (*arg_ptr == '\0' || opt_ptr[opt_pos] != *arg_ptr) {
-                                        /* b ended first or a and b do not match */
+                                    if (
+                                      *arg_ptr == '\0' ||
+                                      opt_ptr[opt_pos] != *arg_ptr) {
+                                        /* b ended first or a and b do not
+                                         * match */
                                         break;
                                     }
                                     opt_pos++;
@@ -3315,7 +3624,8 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                         arg = arg->next;
                     }
                     if (arg == MPTEST_NULL) {
-                        if ((err = aparse__error_unrecognized_arg(state, arg_text))) {
+                        if ((err = aparse__error_unrecognized_arg(
+                               state, arg_text))) {
                             return err;
                         }
                         return APARSE_ERROR_PARSE;
@@ -3323,18 +3633,19 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                 }
                 if (*arg_end == '=') {
                     /* use equals as argument */
-                    if (arg->nargs == 0
-                        || arg->nargs > 1) {
+                    if (arg->nargs == 0 || arg->nargs > 1) {
                         if ((err = aparse__error_begin_arg(state, arg))) {
                             return err;
                         }
-                        if ((err = aparse__state_out_s(state, "cannot parse '='\n"))) {
+                        if ((err = aparse__state_out_s(
+                               state, "cannot parse '='\n"))) {
                             return err;
                         }
                         return APARSE_ERROR_PARSE;
-                    } else  {
+                    } else {
                         arg_end++;
-                        if ((err = arg->callback(arg, state, 0, arg_end, mptest__slen(arg_end)))) {
+                        if ((err = arg->callback(
+                               arg, state, 0, arg_end, mptest__slen(arg_end)))) {
                             return err;
                         }
                     }
@@ -3345,7 +3656,8 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                         if ((err = aparse__error_begin_arg(state, arg))) {
                             return err;
                         }
-                        if ((err = aparse__state_out_s(state, "cannot parse '"))) {
+                        if ((err =
+                               aparse__state_out_s(state, "cannot parse '"))) {
                             return err;
                         }
                         if ((err = aparse__state_out_s(state, arg_end))) {
@@ -3355,9 +3667,11 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                             return err;
                         }
                         return APARSE_ERROR_PARSE;
-                    } else if (arg->nargs != APARSE_NARGS_0_OR_1_EQ &&
-                        arg->nargs != 0) {
-                        if ((err = arg->callback(arg, state, 0, arg_end, mptest__slen(arg_end)))) {
+                    } else if (
+                      arg->nargs != APARSE_NARGS_0_OR_1_EQ &&
+                      arg->nargs != 0) {
+                        if ((err = arg->callback(
+                               arg, state, 0, arg_end, mptest__slen(arg_end)))) {
                             return err;
                         }
                         break;
@@ -3367,23 +3681,26 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                         }
                         /* fallthrough, continue parsing short options */
                     }
-                } else if (argc_idx == argc || !aparse__is_positional(argv[argc_idx])) {
-                    if (arg->nargs == APARSE_NARGS_1_OR_MORE
-                        || arg->nargs == 1
-                        || arg->nargs > 1) {
+                } else if (
+                  argc_idx == argc || !aparse__is_positional(argv[argc_idx])) {
+                    if (
+                      arg->nargs == APARSE_NARGS_1_OR_MORE ||
+                      arg->nargs == 1 || arg->nargs > 1) {
                         if ((err = aparse__error_begin_arg(state, arg))) {
                             return err;
                         }
-                        if ((err = aparse__state_out_s(state, "expected an argument\n"))) {
+                        if ((err = aparse__state_out_s(
+                               state, "expected an argument\n"))) {
                             return err;
                         }
                         return APARSE_ERROR_PARSE;
-                    } else if (arg->nargs == APARSE_NARGS_0_OR_1_EQ
-                            || arg->nargs == 0) {
+                    } else if (
+                      arg->nargs == APARSE_NARGS_0_OR_1_EQ ||
+                      arg->nargs == 0) {
                         if ((err = arg->callback(arg, state, 0, MPTEST_NULL, 0))) {
                             return err;
                         }
-                        /* fallthrough */  
+                        /* fallthrough */
                     } else {
                         if ((err = arg->callback(arg, state, 0, MPTEST_NULL, 0))) {
                             return err;
@@ -3391,15 +3708,16 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                     }
                     break;
                 } else {
-                    if (arg->nargs == APARSE_NARGS_0_OR_1
-                        || arg->nargs == 1) {
+                    if (arg->nargs == APARSE_NARGS_0_OR_1 || arg->nargs == 1) {
                         arg_text = argv[argc_idx++];
                         arg_text_size = mptest__slen(arg_text);
-                        if ((err = arg->callback(arg, state, 0, arg_text, arg_text_size))) {
+                        if ((err = arg->callback(
+                               arg, state, 0, arg_text, arg_text_size))) {
                             return err;
                         }
-                    } else if (arg->nargs == APARSE_NARGS_0_OR_1_EQ
-                            || arg->nargs == 0) {
+                    } else if (
+                      arg->nargs == APARSE_NARGS_0_OR_1_EQ ||
+                      arg->nargs == 0) {
                         if ((err = arg->callback(arg, state, 0, MPTEST_NULL, 0))) {
                             return err;
                         }
@@ -3408,7 +3726,9 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                         while (argc_idx < argc) {
                             arg_text = argv[argc_idx++];
                             arg_text_size = mptest__slen(arg_text);
-                            if ((err = arg->callback(arg, state, sub_arg_idx++, arg_text, arg_text_size))) {
+                            if ((err = arg->callback(
+                                   arg, state, sub_arg_idx++, arg_text,
+                                   arg_text_size))) {
                                 return err;
                             }
                             if ((int)sub_arg_idx == arg->nargs) {
@@ -3419,7 +3739,8 @@ MPTEST_API aparse_error aparse__parse_argv(aparse__state* state, int argc, const
                             if ((err = aparse__error_begin_arg(state, arg))) {
                                 return err;
                             }
-                            if ((err = aparse__state_out_s(state, "expected an argument\n"))) {
+                            if ((err = aparse__state_out_s(
+                                   state, "expected an argument\n"))) {
                                 return err;
                             }
                             return APARSE_ERROR_PARSE;
@@ -3561,15 +3882,15 @@ MPTEST_INTERNAL void mptest__aparse_destroy(struct mptest__state* state)
   mptest__aparse_state* test_state = &state->aparse_state;
   mptest__aparse_name* name = test_state->opt_test_name_head;
   while (name) {
-    mptest__aparse_name* temp = name;
-    MPTEST_FREE(temp);
-    name = temp->next;
+    mptest__aparse_name* next = name->next;
+    MPTEST_FREE(name);
+    name = next;
   }
   name = test_state->opt_suite_name_head;
   while (name) {
-    mptest__aparse_name* temp = name;
-    MPTEST_FREE(temp);
-    name = temp->next;
+    mptest__aparse_name* next = name->next;
+    MPTEST_FREE(name);
+    name = next;
   }
   aparse_destroy(&test_state->aparse);
 }
@@ -3607,7 +3928,7 @@ MPTEST_INTERNAL int mptest__aparse_match_test_name(
     return 1;
   }
   while (name) {
-    if (mptest__scmp_n(name->name, name->name_len, test_name)) {
+    if (mptest__strstr_n(test_name, name->name, name->name_len)) {
       return 1;
     }
     name = name->next;
@@ -3623,7 +3944,7 @@ MPTEST_INTERNAL int mptest__aparse_match_suite_name(
     return 1;
   }
   while (name) {
-    if (mptest__scmp_n(name->name, name->name_len, suite_name)) {
+    if (mptest__strstr_n(suite_name, name->name, name->name_len)) {
       return 1;
     }
     name = name->next;
@@ -4132,6 +4453,30 @@ MPTEST_API void mptest_ex_nomem(void) { mptest_ex(); }
 MPTEST_API void mptest_ex_oom_inject(void) { mptest_ex(); }
 MPTEST_API void mptest_ex_bad_alloc(void) { mptest_ex(); }
 
+MPTEST_API void mptest_malloc_dump(void)
+{
+  struct mptest__state* state = &mptest__state_g;
+  struct mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  struct mptest__leakcheck_block* block = leakcheck_state->first_block;
+  while (block) {
+    printf(
+        "%p: %u bytes at %s:%i: %s%s%s%s",
+        (void*)(((char*)block->header) + MPTEST__LEAKCHECK_HEADER_SIZEOF),
+        (unsigned int)block->block_size, block->file, block->line,
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_INITIAL) ? "I" : "-",
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_FREED) ? "F" : "-",
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_OLD) ? "O" : "-",
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_NEW) ? "N" : "-");
+    if (block->realloc_prev) {
+      printf(
+          " from %p",
+          (void*)(((char*)block->realloc_prev->header) + MPTEST__LEAKCHECK_HEADER_SIZEOF));
+    }
+    printf("\n");
+    block = block->next;
+  }
+}
+
 #endif
 
 /* mptest */
@@ -4382,14 +4727,14 @@ MPTEST_INTERNAL void
 mptest__state_after_test(struct mptest__state* state, mptest__result res)
 {
 #if MPTEST_USE_LEAKCHECK
-  int has_leaks;
-  if (state->leakcheck_state.test_leak_checking == 1) {
+  int has_leaks = 0;
+  if (state->leakcheck_state.test_leak_checking) {
     has_leaks = mptest__leakcheck_has_leaks(state);
     if (has_leaks) {
       if (res == MPTEST__RESULT_PASS) {
+        res = MPTEST__RESULT_FAIL;
         state->fail_reason = MPTEST__FAIL_REASON_LEAKED;
       }
-      res = MPTEST__RESULT_FAIL;
     }
   }
 #endif
@@ -4398,7 +4743,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
     state->passes++;
     state->total++;
     printf(MPTEST__COLOR_PASS "passed" MPTEST__COLOR_RESET);
-  } else if (res == MPTEST__RESULT_FAIL) {
+  }
+  if (res == MPTEST__RESULT_FAIL) {
     /* Test failed -> fail the current suite, print diagnostics */
     state->fails++;
     state->total++;
@@ -4433,7 +4779,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
 #endif
     }
 #if MPTEST_USE_SYM
-    else if (state->fail_reason == MPTEST__FAIL_REASON_SYM_INEQUALITY) {
+    if (state->fail_reason == MPTEST__FAIL_REASON_SYM_INEQUALITY) {
       /* Sym inequality -> show both syms, message, source */
       mptest__state_print_indent(state);
       printf(
@@ -4454,7 +4800,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
     }
 #endif
 #if MPTEST_USE_LEAKCHECK
-    else if (state->fail_reason == MPTEST__FAIL_REASON_LEAKED || has_leaks) {
+    if (state->fail_reason == MPTEST__FAIL_REASON_LEAKED || has_leaks) {
       struct mptest__leakcheck_block* current =
           state->leakcheck_state.first_block;
       mptest__state_print_indent(state);
@@ -4485,6 +4831,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
           mptest__state_print_indent(state);
           printf("      ...at ");
           mptest__print_source_location(current->file, current->line);
+          printf("\n");
         }
         current = current->next;
       }
@@ -4499,10 +4846,9 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
     }
     printf(MPTEST__COLOR_FAIL "error!" MPTEST__COLOR_RESET "\n");
     if (0) {
-
     }
 #if MPTEST_USE_DYN_ALLOC
-    else if (state->fail_reason == MPTEST__FAIL_REASON_NOMEM) {
+    if (state->fail_reason == MPTEST__FAIL_REASON_NOMEM) {
       mptest__state_print_indent(state);
       printf(
           "  " MPTEST__COLOR_FAIL "out of memory: " MPTEST__COLOR_RESET
@@ -4511,7 +4857,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
     }
 #endif
 #if MPTEST_USE_SYM
-    else if (state->fail_reason == MPTEST__FAIL_REASON_SYM_SYNTAX) {
+    if (state->fail_reason == MPTEST__FAIL_REASON_SYM_SYNTAX) {
       /* Sym syntax error -> show message, source, error info */
       mptest__state_print_indent(state);
       printf(
@@ -4544,28 +4890,31 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__print_source_location(state->fail_file, state->fail_line);
     }
 #if MPTEST_USE_LEAKCHECK
-    else if (state->fail_reason == MPTEST__FAIL_REASON_NOMEM) {
+    if (state->fail_reason == MPTEST__FAIL_REASON_NOMEM) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL "internal error: malloc() returned "
              "a null pointer" MPTEST__COLOR_RESET "\n");
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_NULL) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_NULL) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL "attempt to call realloc() on a NULL "
              "pointer" MPTEST__COLOR_RESET "\n");
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_NULL) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_NULL) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL "attempt to call free() on a NULL "
              "pointer" MPTEST__COLOR_RESET "\n");
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_INVALID) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_INVALID) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL "attempt to call realloc() on an "
              "invalid pointer (pointer was not "
@@ -4575,7 +4924,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_FREED) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_FREED) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL
              "attempt to call realloc() on a pointer that was already "
@@ -4585,7 +4935,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL
              "attempt to call realloc() on a pointer that was already "
@@ -4595,7 +4946,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_INVALID) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_INVALID) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL "attempt to call free() on an "
              "invalid pointer (pointer was not "
@@ -4605,7 +4957,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL
              "attempt to call free() on a pointer that was already "
@@ -4615,7 +4968,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-    } else if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
+    }
+    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
       mptest__state_print_indent(state);
       printf("  " MPTEST__COLOR_FAIL
              "attempt to call free() on a pointer that was already "
@@ -4628,11 +4982,6 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
     }
 #endif
 #endif
-    else {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL "unknown error" MPTEST__COLOR_RESET
-             ": a bug has occurred");
-    }
 #if MPTEST_USE_FUZZ
     /* Print fuzz information, if any */
     mptest__fuzz_print(state);

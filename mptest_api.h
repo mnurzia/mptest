@@ -72,6 +72,7 @@ MN_API void mptest__leakcheck_set(struct mptest__state* state, int on);
 MN_API void mptest_ex_nomem(void);
 MN_API void mptest_ex_oom_inject(void);
 MN_API void mptest_ex_bad_alloc(void);
+MN_API void mptest_malloc_dump(void);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -89,14 +90,16 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 
 #define _ASSERT_PASS_BEHAVIOR(expr, msg)                                       \
   do {                                                                         \
-    mptest__assert_pass(&mptest__state_g, #msg, #expr, __FILE__, __LINE__);    \
+    mptest__assert_pass(&mptest__state_g, msg, #expr, __FILE__, __LINE__);     \
   } while (0)
 
 #define _ASSERT_FAIL_BEHAVIOR(expr, msg)                                       \
   do {                                                                         \
-    mptest__assert_fail(&mptest__state_g, #msg, #expr, __FILE__, __LINE__);    \
+    mptest__assert_fail(&mptest__state_g, msg, #expr, __FILE__, __LINE__);     \
     return MPTEST__RESULT_FAIL;                                                \
   } while (0)
+
+#define _STRIFY(expr) #expr
 
 /* Used for binary assertions (<, >, <=, >=, ==, !=) in order to format error
  * messages correctly. */
@@ -112,9 +115,9 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 #define _ASSERT_BINOP(lhs, rhs, op)                                            \
   do {                                                                         \
     if (!((lhs)op(rhs))) {                                                     \
-      _ASSERT_FAIL_BEHAVIOR(lhs op rhs, lhs op rhs);                           \
+      _ASSERT_FAIL_BEHAVIOR(lhs op rhs, _STRIFY(lhs op rhs));                  \
     } else {                                                                   \
-      _ASSERT_PASS_BEHAVIOR(lhs op rhs, lhs op rhs);                           \
+      _ASSERT_PASS_BEHAVIOR(lhs op rhs, _STRIFY(lhs op rhs));                  \
     }                                                                          \
   } while (0)
 
@@ -198,6 +201,14 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
 #define ASSERT_LT(lhs, rhs) _ASSERT_BINOP(lhs, rhs, <)
 #define ASSERT_GTE(lhs, rhs) _ASSERT_BINOP(lhs, rhs, >=)
 #define ASSERT_LTE(lhs, rhs) _ASSERT_BINOP(lhs, rhs, <=)
+
+#define PROPAGATE(expr)                                                        \
+  do {                                                                         \
+    int _mptest_err = (expr);                                                  \
+    if (_mptest_err != MPTEST__RESULT_PASS) {                                  \
+      return _mptest_err;                                                      \
+    }                                                                          \
+  } while (0)
 
 #if MPTEST_USE_LONGJMP
 
@@ -436,11 +447,15 @@ MN_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
   do {                                                                         \
     mptest_sym_build temp_build;                                               \
     mptest_sym_walk temp_walk;                                                 \
+    int _sym_err;                                                              \
     if (mptest__sym_make_init(                                                 \
             &temp_build, &temp_walk, str, __FILE__, __LINE__, MN_NULL)) {      \
       return MPTEST__RESULT_ERROR;                                             \
     }                                                                          \
-    if (type##_from_sym(&temp_walk, out_var)) {                                \
+    if ((_sym_err = type##_from_sym(&temp_walk, out_var))) {                   \
+      if (_sym_err == SYM_NOMEM) {                                             \
+        return MPTEST__RESULT_PASS;                                            \
+      }                                                                        \
       return MPTEST__RESULT_ERROR;                                             \
     }                                                                          \
     mptest__sym_make_destroy(&temp_build);                                     \
@@ -497,6 +512,7 @@ MN_API void mptest__sym_make_destroy(mptest_sym_build* build_out);
 #define SYM_WRONG_TYPE 6
 #define SYM_NO_MORE 7
 #define SYM_INVALID 8
+#define SYM_NOMEM 9
 
 #endif
 

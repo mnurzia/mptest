@@ -15,6 +15,12 @@
 
 #define MN_INTERNAL_DATA static
 
+#if MPTEST_USE_APARSE
+/* bits/util/ntstr/strstr_n */
+MN_INTERNAL const char*
+mn__strstr_n(const char* s, const char* sub, mn_size sub_size);
+#endif /* MPTEST_USE_APARSE */
+
 /* bits/util/preproc/token_paste */
 #define MN__PASTE_0(a, b) a ## b
 #define MN__PASTE(a, b) MN__PASTE_0(a, b)
@@ -63,11 +69,6 @@ const mn_char* mn__str_view_get_data(const mn__str_view* view);
 int mn__str_view_cmp(const mn__str_view* a, const mn__str_view* b);
 #endif /* MPTEST_USE_DYN_ALLOC */
 #endif /* MPTEST_USE_SYM */
-
-#if MPTEST_USE_APARSE
-/* bits/util/ntstr/cmp_n */
-MN_INTERNAL int mn__scmp_n(const char* a, mn_size a_size, const char* b);
-#endif /* MPTEST_USE_APARSE */
 
 /* bits/util/ntstr/len */
 MN_INTERNAL mn_size mn__slen(const mn_char* s);

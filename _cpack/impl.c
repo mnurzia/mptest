@@ -1,5 +1,28 @@
 #include "internal.h"
 
+#if MPTEST_USE_APARSE
+/* bits/util/ntstr/strstr_n */
+MN_INTERNAL const char*
+mn__strstr_n(const char* s, const char* sub, mn_size sub_size) {
+    while (*s) {
+        const char* sa = s;
+        mn_size pos = 0;
+        while (*sa && (pos != sub_size)) {
+            if (*sa != sub[pos]) {
+                break;
+            }
+            sa++;
+            pos++;
+        }
+        if (pos == sub_size) {
+            return s;
+        }
+        s++;
+    }
+    return MN_NULL;
+}
+#endif /* MPTEST_USE_APARSE */
+
 /* bits/types/char */
 MN__STATIC_ASSERT(mn__char_is_one_byte, sizeof(mn_char) == 1);
 
@@ -345,31 +368,6 @@ int mn__str_view_cmp(const mn__str_view* view_a, const mn__str_view* view_b) {
  * that is 32 bits wide. */
 MN__STATIC_ASSERT(mn__int32_is_4_bytes, sizeof(mn_int32) == 4);
 #endif /* MPTEST_USE_SYM */
-
-#if MPTEST_USE_APARSE
-/* bits/util/ntstr/cmp_n */
-MN_INTERNAL int mn__scmp_n(const char* a, mn_size a_size, const char* b)
-{
-    mn_size a_pos = 0;
-    while (1) {
-        if (a_pos == a_size) {
-            if (*b != '\0') {
-                return 0;
-            } else {
-                /* *b equals '\0' or '=' */
-                return 1;
-            }
-        }
-        if (*b == '\0' || a[a_pos] != *b) {
-            /* b ended first or a and b do not match */
-            return 0;
-        }
-        a_pos++;
-        b++;
-    }
-    return 0;
-}
-#endif /* MPTEST_USE_APARSE */
 
 /* bits/util/ntstr/len */
 MN_INTERNAL mn_size mn__slen(const mn_char* s) {

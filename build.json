@@ -45,7 +45,7 @@
             ]
         },
         {
-            "name": "bits/util/ntstr/cmp_n",
+            "name": "bits/util/ntstr/strstr_n",
             "flags": [
                 "MPTEST_USE_APARSE"
             ]

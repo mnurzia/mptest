@@ -409,4 +409,28 @@ MN_API void mptest_ex_nomem(void) { mptest_ex(); }
 MN_API void mptest_ex_oom_inject(void) { mptest_ex(); }
 MN_API void mptest_ex_bad_alloc(void) { mptest_ex(); }
 
+MN_API void mptest_malloc_dump(void)
+{
+  struct mptest__state* state = &mptest__state_g;
+  struct mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  struct mptest__leakcheck_block* block = leakcheck_state->first_block;
+  while (block) {
+    printf(
+        "%p: %u bytes at %s:%i: %s%s%s%s",
+        (void*)(((char*)block->header) + MPTEST__LEAKCHECK_HEADER_SIZEOF),
+        (unsigned int)block->block_size, block->file, block->line,
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_INITIAL) ? "I" : "-",
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_FREED) ? "F" : "-",
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_OLD) ? "O" : "-",
+        (block->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_NEW) ? "N" : "-");
+    if (block->realloc_prev) {
+      printf(
+          " from %p",
+          (void*)(((char*)block->realloc_prev->header) + MPTEST__LEAKCHECK_HEADER_SIZEOF));
+    }
+    printf("\n");
+    block = block->next;
+  }
+}
+
 #endif

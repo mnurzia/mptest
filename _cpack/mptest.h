@@ -294,6 +294,10 @@ typedef int mptest__result;
 /* or a miscellaneous error like a sym syntax error */
 #define MPTEST__RESULT_ERROR -2
 
+#define MPTEST__FAULT_MODE_OFF 0
+#define MPTEST__FAULT_MODE_SET 1
+#define MPTEST__FAULT_MODE_ONE 2
+
 #if MPTEST_USE_LEAKCHECK
 typedef int mptest__leakcheck_mode;
 
@@ -336,6 +340,8 @@ MPTEST_API void mptest__catch_assert_fail(
     struct mptest__state* state, const char* msg, const char* assert_expr,
     const char* file, int line);
 
+MPTEST_API void mptest__fault_set(struct mptest__state* state, int on);
+
 #if MPTEST_USE_LEAKCHECK
 MPTEST_API void* mptest__leakcheck_hook_malloc(
     struct mptest__state* state, const char* file, int line, size_t size);
@@ -347,9 +353,11 @@ MPTEST_API void* mptest__leakcheck_hook_realloc(
 MPTEST_API void mptest__leakcheck_set(struct mptest__state* state, int on);
 
 MPTEST_API void mptest_ex_nomem(void);
+MPTEST_API void mptest_ex_fault(void);
 MPTEST_API void mptest_ex_oom_inject(void);
 MPTEST_API void mptest_ex_bad_alloc(void);
 MPTEST_API void mptest_malloc_dump(void);
+MPTEST_API int mptest_fault(const char* class);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -590,6 +598,12 @@ MPTEST_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
     mptest__state_report(&mptest__state_g);                                    \
     mptest__state_destroy(&mptest__state_g);                                   \
   } while (0)
+
+#define MPTEST_ENABLE_FAULT_CHECKING()                                         \
+  mptest__fault_set(&mptest__state_g, MPTEST__FAULT_MODE_ONE)
+
+#define MPTEST_DISABLE_FAULT_CHECKING()                                        \
+  mptest__fault_set(&mptest__state_g, MPTEST__FAULT_MODE_OFF)
 
 #if MPTEST_USE_FUZZ
 
@@ -1454,14 +1468,14 @@ typedef struct mptest__aparse_state {
   aparse_state aparse;
   /*     --leak-check : whether to enable leak checking or not */
   int opt_leak_check;
-  /*     --leak-check-oom : whether to enable OOM checking or not */
-  int opt_leak_check_oom;
   /* -t, --test : the test name(s) to search for and run */
   mptest__aparse_name* opt_test_name_head;
   mptest__aparse_name* opt_test_name_tail;
   /* -s, --suite : the suite name(s) to search for and run */
   mptest__aparse_name* opt_suite_name_head;
   mptest__aparse_name* opt_suite_name_tail;
+  /*     --fault-check : whether to enable fault checking */
+  int opt_fault_check;
   /*     --leak-check-pass : whether to enable leak check malloc passthrough */
   int opt_leak_check_pass;
 } mptest__aparse_state;
@@ -1492,10 +1506,6 @@ typedef struct mptest__leakcheck_state {
   int total_allocations;
   /* Total number of calls to malloc() or realloc(). */
   int total_calls;
-  /* Whether or not the current test failed on an OOM condition */
-  int oom_failed;
-  /* The index of the call that the test failed on */
-  int oom_fail_call;
   /* Whether or not to let allocations fall through */
   int fall_through;
 } mptest__leakcheck_state;
@@ -1560,6 +1570,14 @@ struct mptest__state {
   mptest__fail_data fail_data;
   /* Indentation level (used for output) */
   int indent_lvl;
+  /* Fault checking mode */
+  int fault_checking;
+  /* Number of possible fault calls */
+  int fault_calls;
+  /* Iteration that the fault failed on */
+  int fault_fail_call_idx;
+  /* Whether or not a fault caused a failure */
+  int fault_failed;
 
 #if MPTEST_USE_LONGJMP
   mptest__longjmp_state longjmp_state;
@@ -1587,6 +1605,7 @@ struct mptest__state {
 MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
     struct mptest__state* state, mptest__test_func test_func);
 MPTEST_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
+MPTEST_INTERNAL int mptest__fault(struct mptest__state* state, const char* class);
 
 #if MPTEST_USE_LONGJMP
 
@@ -3844,18 +3863,18 @@ MPTEST_INTERNAL int mptest__aparse_init(struct mptest__state* state)
   aparse_arg_help(aparse, "Run suites that match the substring NAME");
   aparse_arg_metavar(aparse, "NAME");
 
+  if ((err = aparse_add_opt(aparse, 0, "fault-check"))) {
+    return err;
+  }
+  aparse_arg_type_bool(aparse, &test_state->opt_fault_check);
+  aparse_arg_help(aparse, "Instrument tests by simulating faults");
+
 #if MPTEST_USE_LEAKCHECK
   if ((err = aparse_add_opt(aparse, 0, "leak-check"))) {
     return err;
   }
   aparse_arg_type_bool(aparse, &test_state->opt_leak_check);
   aparse_arg_help(aparse, "Instrument tests with memory leak checking");
-
-  if ((err = aparse_add_opt(aparse, 0, "leak-check-oom"))) {
-    return err;
-  }
-  aparse_arg_type_bool(aparse, &test_state->opt_leak_check_oom);
-  aparse_arg_help(aparse, "Simulate out-of-memory errors");
 
   if ((err = aparse_add_opt(aparse, 0, "leak-check-pass"))) {
     return err;
@@ -3906,10 +3925,10 @@ MPTEST_API int mptest__state_init_argv(
   } else if (stat != 0) {
     return stat;
   }
-#if MPTEST_USE_LEAKCHECK
-  if (state->aparse_state.opt_leak_check_oom) {
-    state->leakcheck_state.test_leak_checking = MPTEST__LEAKCHECK_MODE_OOM_SET;
+  if (state->aparse_state.opt_fault_check) {
+    state->fault_checking = MPTEST__FAULT_MODE_SET;
   }
+#if MPTEST_USE_LEAKCHECK
   if (state->aparse_state.opt_leak_check) {
     state->leakcheck_state.test_leak_checking = MPTEST__LEAKCHECK_MODE_ON;
   }
@@ -4030,11 +4049,12 @@ MPTEST_INTERNAL void mptest__fuzz_print(struct mptest__state* state)
 {
   mptest__fuzz_state* fuzz_state = &state->fuzz_state;
   if (fuzz_state->fuzz_failed) {
-    printf("\n");
     mptest__state_print_indent(state);
     printf(
-        "    ...on iteration %i with seed %lX", fuzz_state->fuzz_fail_iteration,
-        fuzz_state->fuzz_fail_seed);
+        "    ...on fuzz iteration " MPTEST__COLOR_EMPHASIS
+        "%i" MPTEST__COLOR_RESET " with seed " MPTEST__COLOR_EMPHASIS
+        "%lX" MPTEST__COLOR_RESET "\n",
+        fuzz_state->fuzz_fail_iteration, fuzz_state->fuzz_fail_seed);
   }
   fuzz_state->fuzz_failed = 0;
   /* Reset fuzz iterations, needs to be done after every fuzzed test */
@@ -4125,8 +4145,6 @@ MPTEST_INTERNAL void mptest__leakcheck_init(struct mptest__state* state)
   leakcheck_state->top_block = NULL;
   leakcheck_state->total_allocations = 0;
   leakcheck_state->total_calls = 0;
-  leakcheck_state->oom_failed = 0;
-  leakcheck_state->oom_fail_call = -1;
   leakcheck_state->fall_through = 0;
 }
 
@@ -4189,18 +4207,8 @@ MPTEST_API void* mptest__leakcheck_hook_malloc(
   if (!leakcheck_state->test_leak_checking) {
     return (char*)MPTEST_MALLOC(size);
   }
-  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
-    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
-      leakcheck_state->total_calls++;
-      mptest_ex_oom_inject();
-      return NULL;
-    }
-  }
-  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
-    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
-      mptest_ex_oom_inject();
-      return NULL;
-    }
+  if (mptest__fault(state, "malloc")) {
+    return NULL;
   }
   if (leakcheck_state->fall_through) {
     leakcheck_state->total_calls++;
@@ -4317,18 +4325,8 @@ MPTEST_API void* mptest__leakcheck_hook_realloc(
   if (!leakcheck_state->test_leak_checking) {
     return (void*)MPTEST_REALLOC(old_ptr, new_size);
   }
-  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_ONE) {
-    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
-      leakcheck_state->total_calls++;
-      mptest_ex_oom_inject();
-      return NULL;
-    }
-  }
-  if (leakcheck_state->test_leak_checking == MPTEST__LEAKCHECK_MODE_OOM_SET) {
-    if (leakcheck_state->total_calls == leakcheck_state->oom_fail_call) {
-      mptest_ex_oom_inject();
-      return NULL;
-    }
+  if (mptest__fault(state, "realloc")) {
+    return NULL;
   }
   if (leakcheck_state->fall_through) {
     leakcheck_state->total_calls++;
@@ -4411,42 +4409,6 @@ MPTEST_API void* mptest__leakcheck_hook_realloc(
 MPTEST_API void mptest__leakcheck_set(struct mptest__state* state, int on)
 {
   state->leakcheck_state.test_leak_checking = on;
-}
-
-MPTEST_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
-    struct mptest__state* state, mptest__test_func test_func)
-{
-  int max_iter = 0;
-  int i;
-  mptest__result res = MPTEST__RESULT_PASS;
-  struct mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
-  leakcheck_state->oom_fail_call = -1;
-  leakcheck_state->oom_failed = 0;
-  mptest__leakcheck_reset(state);
-  res = mptest__state_do_run_test(state, test_func);
-  max_iter = leakcheck_state->total_calls;
-  if (res) {
-    /* Initial test failed. */
-    return res;
-  }
-  for (i = 0; i < max_iter; i++) {
-    int should_finish = 0;
-    mptest__leakcheck_reset(state);
-    leakcheck_state->oom_fail_call = i;
-    res = mptest__state_do_run_test(state, test_func);
-    if (res != MPTEST__RESULT_PASS) {
-      should_finish = 1;
-    }
-    if (mptest__leakcheck_has_leaks(state)) {
-      should_finish = 1;
-    }
-    if (should_finish) {
-      /* Save fail context */
-      leakcheck_state->oom_failed = 1;
-      break;
-    }
-  }
-  return res;
 }
 
 MPTEST_API void mptest_ex_nomem(void) { mptest_ex(); }
@@ -4543,6 +4505,10 @@ MPTEST_API void mptest__state_init(struct mptest__state* state)
   state->fail_file = NULL;
   state->fail_line = 0;
   state->indent_lvl = 0;
+  state->fault_checking = 0;
+  state->fault_calls = 0;
+  state->fault_fail_call_idx = -1;
+  state->fault_failed = 0;
 #if MPTEST_USE_LONGJMP
   mptest__longjmp_init(state);
 #endif
@@ -4664,6 +4630,71 @@ MPTEST_INTERNAL int mptest__streq(const char* a, const char* b)
   }
 }
 
+MPTEST_INTERNAL int mptest__fault(struct mptest__state* state, const char* class)
+{
+  MPTEST__UNUSED(class);
+  if (state->fault_checking == MPTEST__FAULT_MODE_ONE &&
+      state->fault_calls == state->fault_fail_call_idx) {
+    state->fault_calls++;
+    return 1;
+  } else if (
+      state->fault_checking == MPTEST__FAULT_MODE_SET &&
+      state->fault_calls == state->fault_fail_call_idx) {
+    return 1;
+  } else {
+    state->fault_calls++;
+  }
+  return 0;
+}
+
+MPTEST_API int mptest_fault(const char* class)
+{
+  return mptest__fault(&mptest__state_g, class);
+}
+
+MPTEST_INTERNAL void mptest__fault_reset(struct mptest__state* state)
+{
+  state->fault_calls = 0;
+  state->fault_failed = 0;
+  state->fault_fail_call_idx = -1;
+}
+
+MPTEST_INTERNAL mptest__result
+mptest__fault_run_test(struct mptest__state* state, mptest__test_func test_func)
+{
+  int max_iter = 0;
+  int i;
+  mptest__result res = MPTEST__RESULT_PASS;
+  /* Suspend fault checking */
+  int fault_prev = state->fault_checking;
+  state->fault_checking = MPTEST__FAULT_MODE_OFF;
+  mptest__fault_reset(state);
+  res = mptest__state_do_run_test(state, test_func);
+  /* Reinstate fault checking */
+  state->fault_checking = fault_prev;
+  max_iter = state->fault_calls;
+  if (res != MPTEST__RESULT_PASS) {
+    /* Initial test failed. */
+    return res;
+  }
+  for (i = 0; i < max_iter; i++) {
+    mptest__fault_reset(state);
+    state->fault_fail_call_idx = i;
+    res = mptest__state_do_run_test(state, test_func);
+    if (res != MPTEST__RESULT_PASS) {
+      /* Save fail context */
+      state->fault_failed = 1;
+      break;
+    }
+  }
+  return res;
+}
+
+MPTEST_API void mptest__fault_set(struct mptest__state* state, int on)
+{
+  state->fault_checking = on;
+}
+
 /* Ran when setting up for a test before it is run. */
 MPTEST_INTERNAL mptest__result mptest__state_before_test(
     struct mptest__state* state, mptest__test_func test_func,
@@ -4686,24 +4717,15 @@ MPTEST_INTERNAL mptest__result mptest__state_before_test(
     return MPTEST__RESULT_SKIPPED;
   }
 #endif
-#if MPTEST_USE_LEAKCHECK
-  if (state->leakcheck_state.test_leak_checking == MPTEST__LEAKCHECK_MODE_OFF ||
-      state->leakcheck_state.test_leak_checking == MPTEST__LEAKCHECK_MODE_ON) {
+  if (state->fault_checking == MPTEST__FAULT_MODE_OFF) {
 #if MPTEST_USE_FUZZ
     return mptest__fuzz_run_test(state, test_func);
 #else
     return mptest__state_do_run_test(state, test_func);
 #endif
   } else {
-    return mptest__leakcheck_oom_run_test(state, test_func);
+    return mptest__fault_run_test(state, test_func);
   }
-#else
-#if MPTEST_USE_FUZZ
-  return mptest__fuzz_run_test(state, test_func);
-#else
-  return mptest__state_do_run_test(state, test_func);
-#endif
-#endif
 }
 
 MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
@@ -4718,6 +4740,11 @@ MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
   }
 #else
   res = test_func();
+#endif
+#if MPTEST_USE_LEAKCHECK
+  if (mptest__leakcheck_has_leaks(state)) {
+    return MPTEST__RESULT_FAIL;
+  }
 #endif
   return res;
 }
@@ -4742,7 +4769,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
     /* Test passed -> print pass message */
     state->passes++;
     state->total++;
-    printf(MPTEST__COLOR_PASS "passed" MPTEST__COLOR_RESET);
+    printf(MPTEST__COLOR_PASS "passed" MPTEST__COLOR_RESET "\n");
   }
   if (res == MPTEST__RESULT_FAIL) {
     /* Test failed -> fail the current suite, print diagnostics */
@@ -4773,10 +4800,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       /* Print source location */
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
-#if MPTEST_USE_FUZZ
-      /* Print fuzz information, if any */
-      mptest__fuzz_print(state);
-#endif
+      printf("\n");
     }
 #if MPTEST_USE_SYM
     if (state->fail_reason == MPTEST__FAIL_REASON_SYM_INEQUALITY) {
@@ -4796,6 +4820,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       printf("Expected:");
       mptest__sym_dump(
           state->fail_data.sym_fail_data.sym_expected, 0, state->indent_lvl);
+      printf("\n");
       mptest__sym_check_destroy();
     }
 #endif
@@ -4837,7 +4862,6 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       }
     }
 #endif
-    printf("\n");
   } else if (res == MPTEST__RESULT_ERROR) {
     state->errors++;
     state->total++;
@@ -4864,7 +4888,8 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
           "  " MPTEST__COLOR_FAIL
           "s-expression syntax error" MPTEST__COLOR_RESET
           ": " MPTEST__COLOR_EMPHASIS "%s" MPTEST__COLOR_RESET
-          ":" MPTEST__COLOR_EMPHASIS "%s at position %i\n",
+          ":" MPTEST__COLOR_EMPHASIS "%s" MPTEST__COLOR_RESET
+          "at position %i\n",
           state->fail_msg, state->fail_data.sym_syntax_error_data.err_msg,
           (int)state->fail_data.sym_syntax_error_data.err_pos);
     }
@@ -4897,6 +4922,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_NULL) {
       mptest__state_print_indent(state);
@@ -4905,6 +4931,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_NULL) {
       mptest__state_print_indent(state);
@@ -4913,6 +4940,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_INVALID) {
       mptest__state_print_indent(state);
@@ -4924,6 +4952,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_FREED) {
       mptest__state_print_indent(state);
@@ -4935,6 +4964,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED) {
       mptest__state_print_indent(state);
@@ -4946,6 +4976,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_INVALID) {
       mptest__state_print_indent(state);
@@ -4957,6 +4988,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
       mptest__state_print_indent(state);
@@ -4968,6 +5000,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
     if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
       mptest__state_print_indent(state);
@@ -4979,22 +5012,29 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__state_print_indent(state);
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
+      printf("\n");
     }
 #endif
 #endif
+  } else if (res == MPTEST__RESULT_SKIPPED) {
+    printf("skipped");
+  }
+  if (res == MPTEST__RESULT_FAIL || res == MPTEST__RESULT_ERROR) {
 #if MPTEST_USE_FUZZ
     /* Print fuzz information, if any */
     mptest__fuzz_print(state);
 #endif
-    printf("\n");
-  } else if (res == MPTEST__RESULT_SKIPPED) {
-    printf("skipped");
+    if (state->fault_fail_call_idx != -1) {
+      printf(
+          "    ...at fault iteration " MPTEST__COLOR_EMPHASIS
+          "%i" MPTEST__COLOR_RESET "\n",
+          state->fault_fail_call_idx);
+    }
   }
 #if MPTEST_USE_LEAKCHECK
   /* Reset leak-checking state (IMPORTANT!) */
   mptest__leakcheck_reset(state);
 #endif
-  printf("\n");
 }
 
 MPTEST_API void mptest__run_test(

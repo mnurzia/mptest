@@ -17,6 +17,10 @@ typedef int mptest__result;
 /* or a miscellaneous error like a sym syntax error */
 #define MPTEST__RESULT_ERROR -2
 
+#define MPTEST__FAULT_MODE_OFF 0
+#define MPTEST__FAULT_MODE_SET 1
+#define MPTEST__FAULT_MODE_ONE 2
+
 #if MPTEST_USE_LEAKCHECK
 typedef int mptest__leakcheck_mode;
 
@@ -59,6 +63,8 @@ MN_API void mptest__catch_assert_fail(
     struct mptest__state* state, const char* msg, const char* assert_expr,
     const char* file, int line);
 
+MN_API void mptest__fault_set(struct mptest__state* state, int on);
+
 #if MPTEST_USE_LEAKCHECK
 MN_API void* mptest__leakcheck_hook_malloc(
     struct mptest__state* state, const char* file, int line, size_t size);
@@ -70,9 +76,11 @@ MN_API void* mptest__leakcheck_hook_realloc(
 MN_API void mptest__leakcheck_set(struct mptest__state* state, int on);
 
 MN_API void mptest_ex_nomem(void);
+MN_API void mptest_ex_fault(void);
 MN_API void mptest_ex_oom_inject(void);
 MN_API void mptest_ex_bad_alloc(void);
 MN_API void mptest_malloc_dump(void);
+MN_API int mptest_fault(const char* class);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -313,6 +321,12 @@ MN_API mptest_rand mptest__fuzz_rand(struct mptest__state* state);
     mptest__state_report(&mptest__state_g);                                    \
     mptest__state_destroy(&mptest__state_g);                                   \
   } while (0)
+
+#define MPTEST_ENABLE_FAULT_CHECKING()                                         \
+  mptest__fault_set(&mptest__state_g, MPTEST__FAULT_MODE_ONE)
+
+#define MPTEST_DISABLE_FAULT_CHECKING()                                        \
+  mptest__fault_set(&mptest__state_g, MPTEST__FAULT_MODE_OFF)
 
 #if MPTEST_USE_FUZZ
 

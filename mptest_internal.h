@@ -107,14 +107,14 @@ typedef struct mptest__aparse_state {
   aparse_state aparse;
   /*     --leak-check : whether to enable leak checking or not */
   int opt_leak_check;
-  /*     --leak-check-oom : whether to enable OOM checking or not */
-  int opt_leak_check_oom;
   /* -t, --test : the test name(s) to search for and run */
   mptest__aparse_name* opt_test_name_head;
   mptest__aparse_name* opt_test_name_tail;
   /* -s, --suite : the suite name(s) to search for and run */
   mptest__aparse_name* opt_suite_name_head;
   mptest__aparse_name* opt_suite_name_tail;
+  /*     --fault-check : whether to enable fault checking */
+  int opt_fault_check;
   /*     --leak-check-pass : whether to enable leak check malloc passthrough */
   int opt_leak_check_pass;
 } mptest__aparse_state;
@@ -145,10 +145,6 @@ typedef struct mptest__leakcheck_state {
   int total_allocations;
   /* Total number of calls to malloc() or realloc(). */
   int total_calls;
-  /* Whether or not the current test failed on an OOM condition */
-  int oom_failed;
-  /* The index of the call that the test failed on */
-  int oom_fail_call;
   /* Whether or not to let allocations fall through */
   int fall_through;
 } mptest__leakcheck_state;
@@ -213,6 +209,14 @@ struct mptest__state {
   mptest__fail_data fail_data;
   /* Indentation level (used for output) */
   int indent_lvl;
+  /* Fault checking mode */
+  int fault_checking;
+  /* Number of possible fault calls */
+  int fault_calls;
+  /* Iteration that the fault failed on */
+  int fault_fail_call_idx;
+  /* Whether or not a fault caused a failure */
+  int fault_failed;
 
 #if MPTEST_USE_LONGJMP
   mptest__longjmp_state longjmp_state;
@@ -240,6 +244,7 @@ struct mptest__state {
 MN_INTERNAL mptest__result mptest__state_do_run_test(
     struct mptest__state* state, mptest__test_func test_func);
 MN_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
+MN_INTERNAL int mptest__fault(struct mptest__state* state, const char* class);
 
 #if MPTEST_USE_LONGJMP
 

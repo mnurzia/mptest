@@ -75,11 +75,12 @@ MN_INTERNAL void mptest__fuzz_print(struct mptest__state* state)
 {
   mptest__fuzz_state* fuzz_state = &state->fuzz_state;
   if (fuzz_state->fuzz_failed) {
-    printf("\n");
     mptest__state_print_indent(state);
     printf(
-        "    ...on iteration %i with seed %lX", fuzz_state->fuzz_fail_iteration,
-        fuzz_state->fuzz_fail_seed);
+        "    ...on fuzz iteration " MPTEST__COLOR_EMPHASIS
+        "%i" MPTEST__COLOR_RESET " with seed " MPTEST__COLOR_EMPHASIS
+        "%lX" MPTEST__COLOR_RESET "\n",
+        fuzz_state->fuzz_fail_iteration, fuzz_state->fuzz_fail_seed);
   }
   fuzz_state->fuzz_failed = 0;
   /* Reset fuzz iterations, needs to be done after every fuzzed test */

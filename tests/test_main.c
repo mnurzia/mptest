@@ -34,6 +34,13 @@ TEST(t_enable_disable_leakchecking)
   PASS();
 }
 
+TEST(t_enable_disable_faultchecking)
+{
+  MPTEST_ENABLE_FAULT_CHECKING();
+  MPTEST_DISABLE_FAULT_CHECKING();
+  PASS();
+}
+
 TEST(t_leak_malloc_SHOULD_FAIL)
 {
   void* ptr = MPTEST_INJECT_MALLOC(5);
@@ -57,6 +64,21 @@ TEST(t_oom_initial)
   if (a) {
     MPTEST_INJECT_FREE(a);
   }
+  PASS();
+}
+
+TEST(t_oom_bad_SHOULD_FAIL)
+{
+  void* a = MPTEST_INJECT_MALLOC(5);
+  void* b;
+  if (!a) {
+    PASS();
+  }
+  b = MPTEST_INJECT_MALLOC(10);
+  if (a) {
+    MPTEST_INJECT_FREE(a);
+  }
+  MPTEST_INJECT_FREE(b);
   PASS();
 }
 
@@ -186,9 +208,13 @@ int main(int argc, const char* const* argv)
   RUN_TEST(t_leak_malloc_SHOULD_FAIL);
   RUN_TEST(t_leak_realloc_SHOULD_FAIL);
   MPTEST_DISABLE_LEAK_CHECKING();
-  MPTEST_ENABLE_OOM_ONE();
+  RUN_TEST(t_enable_disable_faultchecking);
+  MPTEST_ENABLE_LEAK_CHECKING();
+  MPTEST_ENABLE_FAULT_CHECKING();
   RUN_TEST(t_oom_initial);
   RUN_TEST(t_fail_SHOULD_FAIL);
+  RUN_TEST(t_oom_bad_SHOULD_FAIL);
+  MPTEST_DISABLE_FAULT_CHECKING();
   MPTEST_DISABLE_LEAK_CHECKING();
   RUN_TEST(t_sym_num);
   RUN_TEST(t_sym_atom_s);

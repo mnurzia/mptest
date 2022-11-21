@@ -86,18 +86,18 @@ MN_INTERNAL int mptest__aparse_init(struct mptest__state* state)
   aparse_arg_help(aparse, "Run suites that match the substring NAME");
   aparse_arg_metavar(aparse, "NAME");
 
+  if ((err = aparse_add_opt(aparse, 0, "fault-check"))) {
+    return err;
+  }
+  aparse_arg_type_bool(aparse, &test_state->opt_fault_check);
+  aparse_arg_help(aparse, "Instrument tests by simulating faults");
+
 #if MPTEST_USE_LEAKCHECK
   if ((err = aparse_add_opt(aparse, 0, "leak-check"))) {
     return err;
   }
   aparse_arg_type_bool(aparse, &test_state->opt_leak_check);
   aparse_arg_help(aparse, "Instrument tests with memory leak checking");
-
-  if ((err = aparse_add_opt(aparse, 0, "leak-check-oom"))) {
-    return err;
-  }
-  aparse_arg_type_bool(aparse, &test_state->opt_leak_check_oom);
-  aparse_arg_help(aparse, "Simulate out-of-memory errors");
 
   if ((err = aparse_add_opt(aparse, 0, "leak-check-pass"))) {
     return err;
@@ -148,10 +148,10 @@ MN_API int mptest__state_init_argv(
   } else if (stat != 0) {
     return stat;
   }
-#if MPTEST_USE_LEAKCHECK
-  if (state->aparse_state.opt_leak_check_oom) {
-    state->leakcheck_state.test_leak_checking = MPTEST__LEAKCHECK_MODE_OOM_SET;
+  if (state->aparse_state.opt_fault_check) {
+    state->fault_checking = MPTEST__FAULT_MODE_SET;
   }
+#if MPTEST_USE_LEAKCHECK
   if (state->aparse_state.opt_leak_check) {
     state->leakcheck_state.test_leak_checking = MPTEST__LEAKCHECK_MODE_ON;
   }

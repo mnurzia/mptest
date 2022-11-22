@@ -533,7 +533,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
 #endif
 #endif
   } else if (res == MPTEST__RESULT_SKIPPED) {
-    printf("skipped");
+    printf("skipped\n");
   }
   if (res == MPTEST__RESULT_FAIL || res == MPTEST__RESULT_ERROR) {
 #if MPTEST_USE_FUZZ
@@ -629,10 +629,10 @@ MN_API void mptest__assert_fail(
 }
 
 /* Dummy function to break on for test assert failures */
-MN_API void mptest_ex_assert_fail() { mptest_ex(); }
+MN_API void mptest_ex_assert_fail(void) { mptest_ex(); }
 
 /* Dummy function to break on for program assert failures */
-MN_API void mptest_ex_uncaught_assert_fail() { mptest_ex(); }
+MN_API void mptest_ex_uncaught_assert_fail(void) { mptest_ex(); }
 
 MN_API MN_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state)
 {
@@ -654,4 +654,4 @@ MN_API void mptest__catch_assert_fail(
       state, MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT, file, line, msg);
 }
 
-MN_API void mptest_ex() { return; }
+MN_API void mptest_ex(void) { return; }

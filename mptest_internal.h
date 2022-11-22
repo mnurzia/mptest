@@ -308,8 +308,6 @@ MN_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state);
 MN_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state);
 MN_INTERNAL int
 mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
-MN_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
-    struct mptest__state* state, mptest__test_func test_func);
 #endif
 
 #if MPTEST_USE_COLOR

@@ -280,6 +280,13 @@ aparse_parse(aparse_state* state, int argc, const char* const* argv);
 /* mptest */
 #ifndef MPTEST_API_H
 #define MPTEST_API_H
+
+/* Plan:
+ * Name  | longjmp | fuzz | time | leakcheck | sym | aparse |
+ *-------+---------+------+------+-----------+-----+--------+
+ * tiny  |         |      |      |           |     |        |
+ * small |    X    |  X   |  X   |           |     |        |
+ * big   |    X    |  X   |  X   |     X     |  X  |   X    | */
 /* Forward declaration */
 struct mptest__state;
 
@@ -303,8 +310,6 @@ typedef int mptest__leakcheck_mode;
 
 #define MPTEST__LEAKCHECK_MODE_OFF 0
 #define MPTEST__LEAKCHECK_MODE_ON 1
-#define MPTEST__LEAKCHECK_MODE_OOM_ONE 2
-#define MPTEST__LEAKCHECK_MODE_OOM_SET 3
 #endif
 
 /* Test function signature */
@@ -1669,8 +1674,6 @@ MPTEST_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state);
 MPTEST_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state);
 MPTEST_INTERNAL int
 mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
-MPTEST_INTERNAL mptest__result mptest__leakcheck_oom_run_test(
-    struct mptest__state* state, mptest__test_func test_func);
 #endif
 
 #if MPTEST_USE_COLOR
@@ -5017,7 +5020,7 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
 #endif
 #endif
   } else if (res == MPTEST__RESULT_SKIPPED) {
-    printf("skipped");
+    printf("skipped\n");
   }
   if (res == MPTEST__RESULT_FAIL || res == MPTEST__RESULT_ERROR) {
 #if MPTEST_USE_FUZZ
@@ -5113,10 +5116,10 @@ MPTEST_API void mptest__assert_fail(
 }
 
 /* Dummy function to break on for test assert failures */
-MPTEST_API void mptest_ex_assert_fail() { mptest_ex(); }
+MPTEST_API void mptest_ex_assert_fail(void) { mptest_ex(); }
 
 /* Dummy function to break on for program assert failures */
-MPTEST_API void mptest_ex_uncaught_assert_fail() { mptest_ex(); }
+MPTEST_API void mptest_ex_uncaught_assert_fail(void) { mptest_ex(); }
 
 MPTEST_API MPTEST_JMP_BUF* mptest__catch_assert_begin(struct mptest__state* state)
 {
@@ -5138,7 +5141,7 @@ MPTEST_API void mptest__catch_assert_fail(
       state, MPTEST__FAIL_REASON_UNCAUGHT_PROGRAM_ASSERT, file, line, msg);
 }
 
-MPTEST_API void mptest_ex() { return; }
+MPTEST_API void mptest_ex(void) { return; }
 
 /* mptest */
 #if MPTEST_USE_SYM
@@ -6090,7 +6093,7 @@ MPTEST_API int mptest__sym_check(const char* file, int line, const char* msg)
   }
 }
 
-MPTEST_API void mptest__sym_check_destroy()
+MPTEST_API void mptest__sym_check_destroy(void)
 {
   mptest__sym_destroy(mptest__state_g.fail_data.sym_fail_data.sym_actual);
   mptest__sym_destroy(mptest__state_g.fail_data.sym_fail_data.sym_expected);

@@ -949,7 +949,7 @@ MN_API int mptest__sym_check(const char* file, int line, const char* msg)
   }
 }
 
-MN_API void mptest__sym_check_destroy()
+MN_API void mptest__sym_check_destroy(void)
 {
   mptest__sym_destroy(mptest__state_g.fail_data.sym_fail_data.sym_actual);
   mptest__sym_destroy(mptest__state_g.fail_data.sym_fail_data.sym_expected);

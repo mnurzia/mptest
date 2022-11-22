@@ -93,6 +93,12 @@ int int_from_sym(sym_walk* walk, int* out)
   return err;
 }
 
+int int_to_sym(sym_build* build, int* in)
+{
+  SYM_PUT_NUM(build, *in);
+  return SYM_OK;
+}
+
 int mn__str_from_sym(sym_walk* walk, mn__str* out)
 {
   int err = 0;
@@ -189,6 +195,20 @@ TEST(t_sym_unmatched_SHOULD_FAIL)
   PASS();
 }
 
+TEST(t_sym_eq)
+{
+  int num = 1;
+  ASSERT_SYMEQ(int, &num, "1");
+  PASS();
+}
+
+TEST(t_sym_ineq_SHOULD_FAIL)
+{
+  int num = 1;
+  ASSERT_SYMEQ(int, &num, "5");
+  PASS();
+}
+
 TEST(t_fuzz_error_SHOULD_FAIL)
 {
   ASSERT_GTE(RAND_PARAM(1000), 5);
@@ -223,6 +243,8 @@ int main(int argc, const char* const* argv)
   RUN_TEST(t_sym_hex);
   RUN_TEST(t_sym_zero);
   RUN_TEST(t_sym_unmatched_SHOULD_FAIL);
+  RUN_TEST(t_sym_eq);
+  RUN_TEST(t_sym_ineq_SHOULD_FAIL);
   FUZZ_TEST(t_fuzz_error_SHOULD_FAIL);
   MPTEST_MAIN_END();
   return 0;

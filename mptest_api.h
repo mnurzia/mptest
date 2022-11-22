@@ -1,6 +1,13 @@
 #ifndef MPTEST_API_H
 #define MPTEST_API_H
 
+/* Plan:
+ * Name  | longjmp | fuzz | time | leakcheck | sym | aparse |
+ *-------+---------+------+------+-----------+-----+--------+
+ * tiny  |         |      |      |           |     |        |
+ * small |    X    |  X   |  X   |           |     |        |
+ * big   |    X    |  X   |  X   |     X     |  X  |   X    | */
+
 #include "_cpack/api.h"
 
 /* Forward declaration */
@@ -26,8 +33,6 @@ typedef int mptest__leakcheck_mode;
 
 #define MPTEST__LEAKCHECK_MODE_OFF 0
 #define MPTEST__LEAKCHECK_MODE_ON 1
-#define MPTEST__LEAKCHECK_MODE_OOM_ONE 2
-#define MPTEST__LEAKCHECK_MODE_OOM_SET 3
 #endif
 
 /* Test function signature */

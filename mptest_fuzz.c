@@ -66,9 +66,11 @@ mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func)
   return res;
 }
 
-MN_INTERNAL void mptest__fuzz_print(struct mptest__state* state)
+MN_INTERNAL void
+mptest__fuzz_report_test(struct mptest__state* state, mptest__result res)
 {
   mptest__fuzz_state* fuzz_state = &state->fuzz_state;
+  MN__UNUSED(res);
   if (fuzz_state->fuzz_failed) {
     mptest__state_print_indent(state);
     printf(

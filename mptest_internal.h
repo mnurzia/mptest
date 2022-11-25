@@ -35,26 +35,6 @@ typedef enum mptest__fail_reason {
   /* Fatal error: mptest (not the program) ran out of memory. */
   MPTEST__FAIL_REASON_NOMEM,
 #endif
-#if MPTEST_USE_LEAKCHECK
-  /* Program tried to call realloc() on null pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_NULL,
-  /* Program tried to call realloc() on invalid pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_INVALID,
-  /* Program tried to call realloc() on an already freed pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_FREED,
-  /* Program tried to call realloc() on an already reallocated pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED,
-  /* Program tried to call free() on a null pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_NULL,
-  /* Program tried to call free() on an invalid pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_INVALID,
-  /* Program tried to call free() on an already freed pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_FREED,
-  /* Program tried to call free() on an already reallocated pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_REALLOCED,
-  /* End-of-test memory check found unfreed blocks. */
-  MPTEST__FAIL_REASON_LEAKED,
-#endif
 #if MPTEST_USE_SYM
   /* Syms compared unequal. */
   MPTEST__FAIL_REASON_SYM_INEQUALITY,
@@ -135,6 +115,31 @@ typedef struct mptest__longjmp_state {
 #endif
 
 #if MPTEST_USE_LEAKCHECK
+typedef enum mptest__leakcheck_fail_reason {
+  /* Memory allocations were balanced and legal */
+  MPTEST__LEAKCHECK_PASS,
+  /* Actually ran out of memory (fatal error) */
+  MPTEST__LEAKCHECK_NOMEM,
+  /* Program tried to call realloc() on null pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_NULL,
+  /* Program tried to call realloc() on invalid pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_INVALID,
+  /* Program tried to call realloc() on an already freed pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_FREED,
+  /* Program tried to call realloc() on an already reallocated pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_REALLOCED,
+  /* Program tried to call free() on a null pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_NULL,
+  /* Program tried to call free() on an invalid pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_INVALID,
+  /* Program tried to call free() on an already freed pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_FREED,
+  /* Program tried to call free() on an already reallocated pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_REALLOCED,
+  /* End-of-test memory check found unfreed blocks. */
+  MPTEST__LEAKCHECK_LEAKED
+} mptest__leakcheck_fail_reason;
+
 typedef struct mptest__leakcheck_state {
   /* 1 if current test should be audited for leaks, 0 otherwise. */
   mptest__leakcheck_mode test_leak_checking;
@@ -147,6 +152,13 @@ typedef struct mptest__leakcheck_state {
   int total_calls;
   /* Whether or not to let allocations fall through */
   int fall_through;
+  /* Whether or not the test failed leakchecking */
+  mptest__leakcheck_fail_reason fail_reason;
+  /* Where the fail occurred */
+  const char* fail_file;
+  int fail_line;
+  /* The offending allocation parameter, if any */
+  void* fail_ptr;
 } mptest__leakcheck_state;
 #endif
 
@@ -244,6 +256,7 @@ struct mptest__state {
 MN_INTERNAL mptest__result mptest__state_do_run_test(
     struct mptest__state* state, mptest__test_func test_func);
 MN_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
+MN_INTERNAL void mptest__print_source_location(const char* file, int line);
 MN_INTERNAL int mptest__fault(struct mptest__state* state, const char* class);
 
 #if MPTEST_USE_LONGJMP
@@ -292,12 +305,12 @@ struct mptest__leakcheck_block {
   /* Realloc chain previous and next */
   struct mptest__leakcheck_block* realloc_prev;
   struct mptest__leakcheck_block* realloc_next;
-  /* Flags (see `enum mptest__leakcheck_block_flags`) */
-  enum mptest__leakcheck_block_flags flags;
   /* Source location where the malloc originated */
   const char* file;
   int line;
-};
+  /* Flags (see `enum mptest__leakcheck_block_flags`) */
+  enum mptest__leakcheck_block_flags flags;
+}; /* Cross fingers and hope for 64 bytes */
 
 #define MPTEST__LEAKCHECK_HEADER_SIZEOF                                        \
   (sizeof(struct mptest__leakcheck_header))
@@ -308,6 +321,12 @@ MN_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state);
 MN_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state);
 MN_INTERNAL int
 mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
+MN_INTERNAL mptest__result mptest__leakcheck_before_test(
+    struct mptest__state* state, mptest__test_func test_func);
+MN_INTERNAL mptest__result
+mptest__leakcheck_after_test(struct mptest__state* state);
+MN_INTERNAL void
+mptest__leakcheck_report_test(struct mptest__state* state, mptest__result res);
 #endif
 
 #if MPTEST_USE_COLOR
@@ -333,6 +352,7 @@ mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
 #if MPTEST_USE_TIME
 MN_INTERNAL void mptest__time_init(struct mptest__state* state);
 MN_INTERNAL void mptest__time_destroy(struct mptest__state* state);
+MN_INTERNAL void mptest__time_end(struct mptest__state* state);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -348,7 +368,8 @@ MN_INTERNAL int mptest__aparse_match_suite_name(
 MN_INTERNAL void mptest__fuzz_init(struct mptest__state* state);
 MN_INTERNAL mptest__result
 mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func);
-MN_INTERNAL void mptest__fuzz_print(struct mptest__state* state);
+MN_INTERNAL void
+mptest__fuzz_report_test(struct mptest__state* state, mptest__result res);
 #endif
 
 #if MPTEST_USE_SYM

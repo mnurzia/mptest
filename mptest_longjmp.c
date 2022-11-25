@@ -23,7 +23,8 @@ MN_INTERNAL void mptest__longjmp_exec(
     int line, const char* msg)
 {
   state->longjmp_state.reason = reason;
-  if (state->longjmp_state.checking == reason) {
+  if (state->longjmp_state.checking == reason &&
+      reason != MPTEST__FAIL_REASON_NONE) {
     MN_LONGJMP(state->longjmp_state.assert_context, 1);
   } else {
     state->fail_file = file;

@@ -527,8 +527,8 @@ error:
   return err;
 }
 
-MN_INTERNAL void
-mptest__sym_dump(mptest_sym* sym, mn_int32 parent_ref, mn_int32 indent)
+MN_INTERNAL void mptest__sym_dump_r(
+    mptest_sym* sym, mn_int32 parent_ref, mn_int32 begin, mn_int32 indent)
 {
   mptest__sym_tree* tree;
   mn_int32 child_ref;
@@ -539,22 +539,50 @@ mptest__sym_dump(mptest_sym* sym, mn_int32 parent_ref, mn_int32 indent)
   tree = mptest__sym_get(sym, parent_ref);
   if (tree->first_child_ref == MPTEST__SYM_NONE) {
     if (tree->type == MPTEST__SYM_TYPE_ATOM_NUMBER) {
-      printf("%i", tree->data.num);
+      printf(MPTEST__COLOR_SYM_INT "%i" MPTEST__COLOR_RESET, tree->data.num);
     } else if (tree->type == MPTEST__SYM_TYPE_ATOM_STRING) {
-      printf("%s", (const char*)mn__str_get_data(&tree->data.str));
+      int has_special = 0;
+      const char* sbegin = mn__str_get_data(&tree->data.str);
+      const char* end = sbegin + mn__str_size(&tree->data.str);
+      while (sbegin != end) {
+        if (*sbegin < 32 || *sbegin > 126) {
+          has_special = 1;
+          break;
+        }
+        sbegin++;
+      }
+      printf(MPTEST__COLOR_SYM_STR);
+      if (has_special) {
+        printf("\"");
+        sbegin = mn__str_get_data(&tree->data.str);
+        while (sbegin != end) {
+          if (*sbegin < 32 || *sbegin > 126) {
+            printf("\\x%02X", *sbegin);
+          } else {
+            printf("%C", *sbegin);
+          }
+          sbegin++;
+        }
+        printf("\"");
+      } else {
+        printf("%s", mn__str_get_data(&tree->data.str));
+      }
+      printf(MPTEST__COLOR_RESET);
     } else if (tree->type == MPTEST__SYM_TYPE_EXPR) {
       printf("()");
     }
   } else {
-    printf("\n");
-    for (i = 0; i < indent; i++) {
-      printf("  ");
+    if (begin != indent) {
+      printf("\n");
+      for (i = 0; i < indent; i++) {
+        printf(" ");
+      }
     }
     printf("(");
     child_ref = tree->first_child_ref;
     while (child_ref != MPTEST__SYM_NONE) {
       mptest__sym_tree* child = mptest__sym_get(sym, child_ref);
-      mptest__sym_dump(sym, child_ref, indent + 1);
+      mptest__sym_dump_r(sym, child_ref, begin, indent + 2);
       child_ref = child->next_sibling_ref;
       if (child_ref != MPTEST__SYM_NONE) {
         printf(" ");
@@ -562,6 +590,16 @@ mptest__sym_dump(mptest_sym* sym, mn_int32 parent_ref, mn_int32 indent)
     }
     printf(")");
   }
+}
+
+MN_INTERNAL void
+mptest__sym_dump(mptest_sym* sym, mn_int32 parent_ref, mn_int32 indent)
+{
+  mn_int32 i;
+  for (i = 0; i < indent; i++) {
+    printf(" ");
+  }
+  mptest__sym_dump_r(sym, parent_ref, indent, indent);
 }
 
 MN_INTERNAL int mptest__sym_equals(

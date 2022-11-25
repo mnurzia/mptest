@@ -317,6 +317,8 @@ mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
 #define MPTEST__COLOR_SUITE_NAME "\x1b[1;35m" /* Suite names */
 #define MPTEST__COLOR_EMPHASIS "\x1b[1m"      /* Important numbers */
 #define MPTEST__COLOR_RESET "\x1b[0m"         /* Regular text */
+#define MPTEST__COLOR_SYM_INT "\x1b[1;36m"    /* Sym integer highlight */
+#define MPTEST__COLOR_SYM_STR "\x1b[1;33m"    /* Sym string highlight */
 #else
 #define MPTEST__COLOR_PASS ""
 #define MPTEST__COLOR_FAIL ""
@@ -324,6 +326,8 @@ mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
 #define MPTEST__COLOR_SUITE_NAME ""
 #define MPTEST__COLOR_EMPHASIS ""
 #define MPTEST__COLOR_RESET ""
+#define MPTEST__COLOR_SYM_INT ""
+#define MPTEST__COLOR_SYM_STR ""
 #endif
 
 #if MPTEST_USE_TIME

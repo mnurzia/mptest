@@ -54,11 +54,6 @@ mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func)
     if (res != MPTEST__RESULT_PASS) {
       should_finish = 1;
     }
-#if MPTEST_USE_LEAKCHECK
-    if (mptest__leakcheck_has_leaks(state)) {
-      should_finish = 1;
-    }
-#endif
     if (should_finish) {
       /* Save fail context */
       fuzz_state->fuzz_fail_iteration = i;

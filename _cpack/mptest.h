@@ -1683,6 +1683,8 @@ mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
 #define MPTEST__COLOR_SUITE_NAME "\x1b[1;35m" /* Suite names */
 #define MPTEST__COLOR_EMPHASIS "\x1b[1m"      /* Important numbers */
 #define MPTEST__COLOR_RESET "\x1b[0m"         /* Regular text */
+#define MPTEST__COLOR_SYM_INT "\x1b[1;36m"    /* Sym integer highlight */
+#define MPTEST__COLOR_SYM_STR "\x1b[1;33m"    /* Sym string highlight */
 #else
 #define MPTEST__COLOR_PASS ""
 #define MPTEST__COLOR_FAIL ""
@@ -1690,6 +1692,8 @@ mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
 #define MPTEST__COLOR_SUITE_NAME ""
 #define MPTEST__COLOR_EMPHASIS ""
 #define MPTEST__COLOR_RESET ""
+#define MPTEST__COLOR_SYM_INT ""
+#define MPTEST__COLOR_SYM_STR ""
 #endif
 
 #if MPTEST_USE_TIME
@@ -4031,11 +4035,6 @@ mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func)
     if (res != MPTEST__RESULT_PASS) {
       should_finish = 1;
     }
-#if MPTEST_USE_LEAKCHECK
-    if (mptest__leakcheck_has_leaks(state)) {
-      should_finish = 1;
-    }
-#endif
     if (should_finish) {
       /* Save fail context */
       fuzz_state->fuzz_fail_iteration = i;
@@ -4735,6 +4734,9 @@ MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
     struct mptest__state* state, mptest__test_func test_func)
 {
   mptest__result res;
+#if MPTEST_USE_LEAKCHECK
+  mptest__leakcheck_reset(state);
+#endif
 #if MPTEST_USE_LONGJMP
   if (MPTEST_SETJMP(state->longjmp_state.test_context) == 0) {
     res = test_func();
@@ -4815,14 +4817,15 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
           ": " MPTEST__COLOR_EMPHASIS "%s" MPTEST__COLOR_RESET "\n",
           state->fail_msg);
       mptest__state_print_indent(state);
-      printf("Actual:");
+      printf("    actual:\n");
       mptest__sym_dump(
-          state->fail_data.sym_fail_data.sym_actual, 0, state->indent_lvl);
+          state->fail_data.sym_fail_data.sym_actual, 0, state->indent_lvl + 6);
       printf("\n");
       mptest__state_print_indent(state);
-      printf("Expected:");
+      printf("    expected:\n");
       mptest__sym_dump(
-          state->fail_data.sym_fail_data.sym_expected, 0, state->indent_lvl);
+          state->fail_data.sym_fail_data.sym_expected, 0,
+          state->indent_lvl + 6);
       printf("\n");
       mptest__sym_check_destroy();
     }
@@ -5671,8 +5674,8 @@ error:
   return err;
 }
 
-MPTEST_INTERNAL void
-mptest__sym_dump(mptest_sym* sym, mptest_int32 parent_ref, mptest_int32 indent)
+MPTEST_INTERNAL void mptest__sym_dump_r(
+    mptest_sym* sym, mptest_int32 parent_ref, mptest_int32 begin, mptest_int32 indent)
 {
   mptest__sym_tree* tree;
   mptest_int32 child_ref;
@@ -5683,22 +5686,50 @@ mptest__sym_dump(mptest_sym* sym, mptest_int32 parent_ref, mptest_int32 indent)
   tree = mptest__sym_get(sym, parent_ref);
   if (tree->first_child_ref == MPTEST__SYM_NONE) {
     if (tree->type == MPTEST__SYM_TYPE_ATOM_NUMBER) {
-      printf("%i", tree->data.num);
+      printf(MPTEST__COLOR_SYM_INT "%i" MPTEST__COLOR_RESET, tree->data.num);
     } else if (tree->type == MPTEST__SYM_TYPE_ATOM_STRING) {
-      printf("%s", (const char*)mptest__str_get_data(&tree->data.str));
+      int has_special = 0;
+      const char* sbegin = mptest__str_get_data(&tree->data.str);
+      const char* end = sbegin + mptest__str_size(&tree->data.str);
+      while (sbegin != end) {
+        if (*sbegin < 32 || *sbegin > 126) {
+          has_special = 1;
+          break;
+        }
+        sbegin++;
+      }
+      printf(MPTEST__COLOR_SYM_STR);
+      if (has_special) {
+        printf("\"");
+        sbegin = mptest__str_get_data(&tree->data.str);
+        while (sbegin != end) {
+          if (*sbegin < 32 || *sbegin > 126) {
+            printf("\\x%02X", *sbegin);
+          } else {
+            printf("%C", *sbegin);
+          }
+          sbegin++;
+        }
+        printf("\"");
+      } else {
+        printf("%s", mptest__str_get_data(&tree->data.str));
+      }
+      printf(MPTEST__COLOR_RESET);
     } else if (tree->type == MPTEST__SYM_TYPE_EXPR) {
       printf("()");
     }
   } else {
-    printf("\n");
-    for (i = 0; i < indent; i++) {
-      printf("  ");
+    if (begin != indent) {
+      printf("\n");
+      for (i = 0; i < indent; i++) {
+        printf(" ");
+      }
     }
     printf("(");
     child_ref = tree->first_child_ref;
     while (child_ref != MPTEST__SYM_NONE) {
       mptest__sym_tree* child = mptest__sym_get(sym, child_ref);
-      mptest__sym_dump(sym, child_ref, indent + 1);
+      mptest__sym_dump_r(sym, child_ref, begin, indent + 2);
       child_ref = child->next_sibling_ref;
       if (child_ref != MPTEST__SYM_NONE) {
         printf(" ");
@@ -5706,6 +5737,16 @@ mptest__sym_dump(mptest_sym* sym, mptest_int32 parent_ref, mptest_int32 indent)
     }
     printf(")");
   }
+}
+
+MPTEST_INTERNAL void
+mptest__sym_dump(mptest_sym* sym, mptest_int32 parent_ref, mptest_int32 indent)
+{
+  mptest_int32 i;
+  for (i = 0; i < indent; i++) {
+    printf(" ");
+  }
+  mptest__sym_dump_r(sym, parent_ref, indent, indent);
 }
 
 MPTEST_INTERNAL int mptest__sym_equals(

@@ -248,6 +248,9 @@ MN_INTERNAL mptest__result mptest__state_do_run_test(
     struct mptest__state* state, mptest__test_func test_func)
 {
   mptest__result res;
+#if MPTEST_USE_LEAKCHECK
+  mptest__leakcheck_reset(state);
+#endif
 #if MPTEST_USE_LONGJMP
   if (MN_SETJMP(state->longjmp_state.test_context) == 0) {
     res = test_func();
@@ -328,14 +331,15 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
           ": " MPTEST__COLOR_EMPHASIS "%s" MPTEST__COLOR_RESET "\n",
           state->fail_msg);
       mptest__state_print_indent(state);
-      printf("Actual:");
+      printf("    actual:\n");
       mptest__sym_dump(
-          state->fail_data.sym_fail_data.sym_actual, 0, state->indent_lvl);
+          state->fail_data.sym_fail_data.sym_actual, 0, state->indent_lvl + 6);
       printf("\n");
       mptest__state_print_indent(state);
-      printf("Expected:");
+      printf("    expected:\n");
       mptest__sym_dump(
-          state->fail_data.sym_fail_data.sym_expected, 0, state->indent_lvl);
+          state->fail_data.sym_fail_data.sym_expected, 0,
+          state->indent_lvl + 6);
       printf("\n");
       mptest__sym_check_destroy();
     }

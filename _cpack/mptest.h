@@ -871,8 +871,8 @@ mptest_size mptest__str_slen(const mptest_char* chars);
 void mptest__str_clear(mptest__str* str);
 void mptest__str_cut_end(mptest__str* str, mptest_size new_size);
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/str_view */
 typedef struct mptest__str_view {
     const mptest_char* _data;
@@ -886,8 +886,8 @@ void mptest__str_view_init_null(mptest__str_view* view);
 mptest_size mptest__str_view_size(const mptest__str_view* view);
 const mptest_char* mptest__str_view_get_data(const mptest__str_view* view);
 int mptest__str_view_cmp(const mptest__str_view* a, const mptest__str_view* b);
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 /* bits/util/ntstr/len */
 MPTEST_INTERNAL mptest_size mptest__slen(const mptest_char* s);
@@ -1047,8 +1047,8 @@ MPTEST_INTERNAL aparse_error
 aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg);
 #endif /* MPTEST_USE_APARSE */
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/vec */
 #define MPTEST__VEC_TYPE(T) \
     MPTEST__PASTE(T, _vec)
@@ -1364,8 +1364,8 @@ aparse__error_print_sub_args(aparse__state* state, const aparse__arg* arg);
         MPTEST__VEC_SETSIZE(T, vec, cap); \
         return 0; \
     }
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 /* mptest */
 #ifndef MPTEST_INTERNAL_H
@@ -1400,26 +1400,6 @@ typedef enum mptest__fail_reason {
 #if MPTEST_USE_DYN_ALLOC
   /* Fatal error: mptest (not the program) ran out of memory. */
   MPTEST__FAIL_REASON_NOMEM,
-#endif
-#if MPTEST_USE_LEAKCHECK
-  /* Program tried to call realloc() on null pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_NULL,
-  /* Program tried to call realloc() on invalid pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_INVALID,
-  /* Program tried to call realloc() on an already freed pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_FREED,
-  /* Program tried to call realloc() on an already reallocated pointer. */
-  MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED,
-  /* Program tried to call free() on a null pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_NULL,
-  /* Program tried to call free() on an invalid pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_INVALID,
-  /* Program tried to call free() on an already freed pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_FREED,
-  /* Program tried to call free() on an already reallocated pointer. */
-  MPTEST__FAIL_REASON_FREE_OF_REALLOCED,
-  /* End-of-test memory check found unfreed blocks. */
-  MPTEST__FAIL_REASON_LEAKED,
 #endif
 #if MPTEST_USE_SYM
   /* Syms compared unequal. */
@@ -1501,6 +1481,31 @@ typedef struct mptest__longjmp_state {
 #endif
 
 #if MPTEST_USE_LEAKCHECK
+typedef enum mptest__leakcheck_fail_reason {
+  /* Memory allocations were balanced and legal */
+  MPTEST__LEAKCHECK_PASS,
+  /* Actually ran out of memory (fatal error) */
+  MPTEST__LEAKCHECK_NOMEM,
+  /* Program tried to call realloc() on null pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_NULL,
+  /* Program tried to call realloc() on invalid pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_INVALID,
+  /* Program tried to call realloc() on an already freed pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_FREED,
+  /* Program tried to call realloc() on an already reallocated pointer. */
+  MPTEST__LEAKCHECK_REALLOC_OF_REALLOCED,
+  /* Program tried to call free() on a null pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_NULL,
+  /* Program tried to call free() on an invalid pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_INVALID,
+  /* Program tried to call free() on an already freed pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_FREED,
+  /* Program tried to call free() on an already reallocated pointer. */
+  MPTEST__LEAKCHECK_FREE_OF_REALLOCED,
+  /* End-of-test memory check found unfreed blocks. */
+  MPTEST__LEAKCHECK_LEAKED
+} mptest__leakcheck_fail_reason;
+
 typedef struct mptest__leakcheck_state {
   /* 1 if current test should be audited for leaks, 0 otherwise. */
   mptest__leakcheck_mode test_leak_checking;
@@ -1513,6 +1518,13 @@ typedef struct mptest__leakcheck_state {
   int total_calls;
   /* Whether or not to let allocations fall through */
   int fall_through;
+  /* Whether or not the test failed leakchecking */
+  mptest__leakcheck_fail_reason fail_reason;
+  /* Where the fail occurred */
+  const char* fail_file;
+  int fail_line;
+  /* The offending allocation parameter, if any */
+  void* fail_ptr;
 } mptest__leakcheck_state;
 #endif
 
@@ -1610,6 +1622,7 @@ struct mptest__state {
 MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
     struct mptest__state* state, mptest__test_func test_func);
 MPTEST_INTERNAL void mptest__state_print_indent(struct mptest__state* state);
+MPTEST_INTERNAL void mptest__print_source_location(const char* file, int line);
 MPTEST_INTERNAL int mptest__fault(struct mptest__state* state, const char* class);
 
 #if MPTEST_USE_LONGJMP
@@ -1658,12 +1671,12 @@ struct mptest__leakcheck_block {
   /* Realloc chain previous and next */
   struct mptest__leakcheck_block* realloc_prev;
   struct mptest__leakcheck_block* realloc_next;
-  /* Flags (see `enum mptest__leakcheck_block_flags`) */
-  enum mptest__leakcheck_block_flags flags;
   /* Source location where the malloc originated */
   const char* file;
   int line;
-};
+  /* Flags (see `enum mptest__leakcheck_block_flags`) */
+  enum mptest__leakcheck_block_flags flags;
+}; /* Cross fingers and hope for 64 bytes */
 
 #define MPTEST__LEAKCHECK_HEADER_SIZEOF                                        \
   (sizeof(struct mptest__leakcheck_header))
@@ -1674,6 +1687,12 @@ MPTEST_INTERNAL void mptest__leakcheck_reset(struct mptest__state* state);
 MPTEST_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state);
 MPTEST_INTERNAL int
 mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
+MPTEST_INTERNAL mptest__result mptest__leakcheck_before_test(
+    struct mptest__state* state, mptest__test_func test_func);
+MPTEST_INTERNAL mptest__result
+mptest__leakcheck_after_test(struct mptest__state* state);
+MPTEST_INTERNAL void
+mptest__leakcheck_report_test(struct mptest__state* state, mptest__result res);
 #endif
 
 #if MPTEST_USE_COLOR
@@ -1699,6 +1718,7 @@ mptest__leakcheck_block_has_freeable(struct mptest__leakcheck_block* block);
 #if MPTEST_USE_TIME
 MPTEST_INTERNAL void mptest__time_init(struct mptest__state* state);
 MPTEST_INTERNAL void mptest__time_destroy(struct mptest__state* state);
+MPTEST_INTERNAL void mptest__time_end(struct mptest__state* state);
 #endif
 
 #if MPTEST_USE_APARSE
@@ -1714,7 +1734,8 @@ MPTEST_INTERNAL int mptest__aparse_match_suite_name(
 MPTEST_INTERNAL void mptest__fuzz_init(struct mptest__state* state);
 MPTEST_INTERNAL mptest__result
 mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func);
-MPTEST_INTERNAL void mptest__fuzz_print(struct mptest__state* state);
+MPTEST_INTERNAL void
+mptest__fuzz_report_test(struct mptest__state* state, mptest__result res);
 #endif
 
 #if MPTEST_USE_SYM
@@ -2045,8 +2066,8 @@ void mptest__str_cut_end(mptest__str* str, mptest_size new_size) {
     MPTEST__STR_DATA(str)[new_size] = '\0';
 }
 
-#if MPTEST_USE_SYM
 #if MPTEST_USE_DYN_ALLOC
+#if MPTEST_USE_SYM
 /* bits/container/str_view */
 void mptest__str_view_init(mptest__str_view* view, const mptest__str* other) {
     view->_size = mptest__str_size(other);
@@ -2098,8 +2119,8 @@ int mptest__str_view_cmp(const mptest__str_view* view_a, const mptest__str_view*
     }
     return 0;
 }
-#endif /* MPTEST_USE_SYM */
 #endif /* MPTEST_USE_DYN_ALLOC */
+#endif /* MPTEST_USE_SYM */
 
 #if MPTEST_USE_SYM
 /* bits/types/fixed/int32 */
@@ -4047,9 +4068,11 @@ mptest__fuzz_run_test(struct mptest__state* state, mptest__test_func test_func)
   return res;
 }
 
-MPTEST_INTERNAL void mptest__fuzz_print(struct mptest__state* state)
+MPTEST_INTERNAL void
+mptest__fuzz_report_test(struct mptest__state* state, mptest__result res)
 {
   mptest__fuzz_state* fuzz_state = &state->fuzz_state;
+  MPTEST__UNUSED(res);
   if (fuzz_state->fuzz_failed) {
     mptest__state_print_indent(state);
     printf(
@@ -4148,6 +4171,10 @@ MPTEST_INTERNAL void mptest__leakcheck_init(struct mptest__state* state)
   leakcheck_state->total_allocations = 0;
   leakcheck_state->total_calls = 0;
   leakcheck_state->fall_through = 0;
+  leakcheck_state->fail_reason = MPTEST__LEAKCHECK_PASS;
+  leakcheck_state->fail_file = NULL;
+  leakcheck_state->fail_line = 0;
+  leakcheck_state->fail_ptr = NULL;
 }
 
 /* Destroy malloc-checking state. */
@@ -4194,6 +4221,16 @@ MPTEST_INTERNAL int mptest__leakcheck_has_leaks(struct mptest__state* state)
   return 0;
 }
 
+MPTEST_INTERNAL void mptest__leakcheck_error(
+    mptest__leakcheck_state* state, mptest__leakcheck_fail_reason fail_reason,
+    const char* file, int line, void* fail_ptr)
+{
+  state->fail_reason = fail_reason;
+  state->fail_ptr = fail_ptr;
+  state->fail_file = file;
+  state->fail_line = line;
+}
+
 MPTEST_API void* mptest__leakcheck_hook_malloc(
     struct mptest__state* state, const char* file, int line, size_t size)
 {
@@ -4219,6 +4256,8 @@ MPTEST_API void* mptest__leakcheck_hook_malloc(
   /* Allocate the memory the user requested + space for the header */
   base_ptr = (char*)MPTEST_MALLOC(size + MPTEST__LEAKCHECK_HEADER_SIZEOF);
   if (base_ptr == NULL) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_NOMEM, file, line, NULL);
     state->fail_data.memory_block = NULL;
     mptest_ex_nomem();
     mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NOMEM, file, line, NULL);
@@ -4227,6 +4266,9 @@ MPTEST_API void* mptest__leakcheck_hook_malloc(
   block_info = (struct mptest__leakcheck_block*)MPTEST_MALLOC(
       sizeof(struct mptest__leakcheck_block));
   if (block_info == NULL) {
+    MPTEST_FREE(base_ptr);
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_NOMEM, file, line, NULL);
     state->fail_data.memory_block = NULL;
     mptest_ex_nomem();
     mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NOMEM, file, line, NULL);
@@ -4274,10 +4316,11 @@ MPTEST_API void mptest__leakcheck_hook_free(
     return;
   }
   if (ptr == NULL) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_FREE_OF_NULL, file, line, NULL);
     state->fail_data.memory_block = NULL;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_FREE_OF_NULL, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   /* Retrieve header by subtracting header size from pointer */
   header =
@@ -4285,24 +4328,27 @@ MPTEST_API void mptest__leakcheck_hook_free(
        mptest__leakcheck_header*)((char*)ptr - MPTEST__LEAKCHECK_HEADER_SIZEOF);
   /* TODO: check for SIGSEGV here */
   if (!mptest__leakcheck_header_check_guard(header)) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_FREE_OF_INVALID, file, line, ptr);
     state->fail_data.memory_block = ptr;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_FREE_OF_INVALID, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   block_info = header->block;
   /* Ensure that the pointer has not been freed or reallocated already */
   if (block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_FREED) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_FREE_OF_FREED, file, line, ptr);
     state->fail_data.memory_block = ptr;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_REALLOC_OF_FREED, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   if (block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_OLD) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_FREE_OF_REALLOCED, file, line, ptr);
     state->fail_data.memory_block = ptr;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_FREE_OF_REALLOCED, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   /* We can finally `free()` the pointer */
   MPTEST_FREE(header);
@@ -4339,28 +4385,35 @@ MPTEST_API void* mptest__leakcheck_hook_realloc(
        mptest__leakcheck_header*)((char*)old_ptr - MPTEST__LEAKCHECK_HEADER_SIZEOF);
   old_block_info = old_header->block;
   if (old_ptr == NULL) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_REALLOC_OF_NULL, file, line, NULL);
     state->fail_data.memory_block = NULL;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_REALLOC_OF_NULL, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   if (!mptest__leakcheck_header_check_guard(old_header)) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_REALLOC_OF_INVALID, file, line,
+        old_ptr);
     state->fail_data.memory_block = old_ptr;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_REALLOC_OF_INVALID, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   if (old_block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_FREED) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_REALLOC_OF_FREED, file, line,
+        old_ptr);
     state->fail_data.memory_block = old_ptr;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_REALLOC_OF_FREED, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   if (old_block_info->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_OLD) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_REALLOC_OF_REALLOCED, file, line,
+        old_ptr);
     state->fail_data.memory_block = old_ptr;
     mptest_ex_bad_alloc();
-    mptest__longjmp_exec(
-        state, MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED, file, line, NULL);
+    mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NONE, file, line, NULL);
   }
   /* Allocate the memory the user requested + space for the header */
   base_ptr =
@@ -4374,6 +4427,8 @@ MPTEST_API void* mptest__leakcheck_hook_realloc(
   new_block_info = (struct mptest__leakcheck_block*)MPTEST_MALLOC(
       sizeof(struct mptest__leakcheck_block));
   if (new_block_info == NULL) {
+    mptest__leakcheck_error(
+        leakcheck_state, MPTEST__LEAKCHECK_NOMEM, file, line, NULL);
     state->fail_data.memory_block = old_ptr;
     mptest_ex_nomem();
     mptest__longjmp_exec(state, MPTEST__FAIL_REASON_NOMEM, file, line, NULL);
@@ -4441,6 +4496,173 @@ MPTEST_API void mptest_malloc_dump(void)
   }
 }
 
+MPTEST_INTERNAL mptest__result mptest__leakcheck_before_test(
+    struct mptest__state* state, mptest__test_func test_func)
+{
+  MPTEST__UNUSED(test_func);
+  mptest__leakcheck_reset(state);
+  return MPTEST__RESULT_PASS;
+}
+
+MPTEST_INTERNAL mptest__result
+mptest__leakcheck_after_test(struct mptest__state* state)
+{
+  if (state->leakcheck_state.test_leak_checking) {
+    int has_leaks = mptest__leakcheck_has_leaks(state);
+    if (has_leaks) {
+      mptest__leakcheck_error(
+          &state->leakcheck_state, MPTEST__LEAKCHECK_LEAKED, NULL, 0, NULL);
+      return MPTEST__RESULT_FAIL;
+    } else {
+      return MPTEST__RESULT_PASS;
+    }
+  }
+  return MPTEST__RESULT_PASS;
+}
+
+MPTEST_INTERNAL void
+mptest__leakcheck_report_test(struct mptest__state* state, mptest__result res)
+{
+  mptest__leakcheck_state* leakcheck_state = &state->leakcheck_state;
+  if (!leakcheck_state->fail_reason || res == MPTEST__RESULT_PASS ||
+      res == MPTEST__RESULT_SKIPPED) {
+    return;
+  }
+  if (leakcheck_state->fail_reason == MPTEST__LEAKCHECK_NOMEM) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL "out of memory" MPTEST__COLOR_RESET "\n");
+  } else if (
+      leakcheck_state->fail_reason == MPTEST__LEAKCHECK_REALLOC_OF_NULL) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL "attempt to call realloc() on a NULL "
+           "pointer" MPTEST__COLOR_RESET "\n");
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(
+        leakcheck_state->fail_file, leakcheck_state->fail_line);
+    printf("\n");
+  } else if (
+      leakcheck_state->fail_reason == MPTEST__LEAKCHECK_REALLOC_OF_INVALID) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL "attempt to call realloc() on an "
+           "invalid pointer (pointer was not "
+           "returned by malloc() or realloc())" MPTEST__COLOR_RESET ":\n");
+    mptest__state_print_indent(state);
+    printf("    pointer: %p\n", leakcheck_state->fail_ptr);
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(
+        leakcheck_state->fail_file, leakcheck_state->fail_line);
+    printf("\n");
+  } else if (
+      leakcheck_state->fail_reason == MPTEST__LEAKCHECK_REALLOC_OF_FREED) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL
+           "attempt to call realloc() on a pointer that was already "
+           "freed" MPTEST__COLOR_RESET ":\n");
+    mptest__state_print_indent(state);
+    printf("    pointer: %p\n", leakcheck_state->fail_ptr);
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(
+        leakcheck_state->fail_file, leakcheck_state->fail_line);
+    printf("\n");
+  } else if (
+      leakcheck_state->fail_reason == MPTEST__LEAKCHECK_REALLOC_OF_REALLOCED) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL
+           "attempt to call realloc() on a pointer that was already "
+           "reallocated" MPTEST__COLOR_RESET ":\n");
+    mptest__state_print_indent(state);
+    printf("    pointer: %p\n", leakcheck_state->fail_ptr);
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(
+        leakcheck_state->fail_file, leakcheck_state->fail_line);
+    printf("\n");
+  } else if (leakcheck_state->fail_reason == MPTEST__LEAKCHECK_FREE_OF_NULL) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL "attempt to call free() on a NULL "
+           "pointer" MPTEST__COLOR_RESET "\n");
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(
+        leakcheck_state->fail_file, leakcheck_state->fail_line);
+    printf("\n");
+  } else if (
+      leakcheck_state->fail_reason == MPTEST__LEAKCHECK_FREE_OF_INVALID) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL "attempt to call free() on an "
+           "invalid pointer (pointer was not "
+           "returned by malloc() or free())" MPTEST__COLOR_RESET ":\n");
+    mptest__state_print_indent(state);
+    printf("    pointer: %p\n", leakcheck_state->fail_ptr);
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(
+        leakcheck_state->fail_file, leakcheck_state->fail_line);
+    printf("\n");
+  } else if (leakcheck_state->fail_reason == MPTEST__LEAKCHECK_FREE_OF_FREED) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL
+           "attempt to call free() on a pointer that was already "
+           "freed" MPTEST__COLOR_RESET ":\n");
+    mptest__state_print_indent(state);
+    printf("    pointer: %p\n", state->fail_data.memory_block);
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(state->fail_file, state->fail_line);
+    printf("\n");
+  } else if (
+      leakcheck_state->fail_reason == MPTEST__LEAKCHECK_FREE_OF_REALLOCED) {
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL
+           "attempt to call free() on a pointer that was already "
+           "reallocated" MPTEST__COLOR_RESET ":\n");
+    mptest__state_print_indent(state);
+    printf("    pointer: %p\n", state->fail_data.memory_block);
+    mptest__state_print_indent(state);
+    printf("    ...at ");
+    mptest__print_source_location(state->fail_file, state->fail_line);
+    printf("\n");
+  }
+  if (leakcheck_state->fail_reason == MPTEST__LEAKCHECK_LEAKED ||
+      mptest__leakcheck_has_leaks(state)) {
+    struct mptest__leakcheck_block* current =
+        state->leakcheck_state.first_block;
+    mptest__state_print_indent(state);
+    printf("  " MPTEST__COLOR_FAIL "memory leak(s) detected" MPTEST__COLOR_RESET
+           ":\n");
+    while (current) {
+      if (mptest__leakcheck_block_has_freeable(current)) {
+        mptest__state_print_indent(state);
+        printf(
+            "    " MPTEST__COLOR_FAIL "leak" MPTEST__COLOR_RESET
+            " of " MPTEST__COLOR_EMPHASIS "%lu" MPTEST__COLOR_RESET
+            " bytes at " MPTEST__COLOR_EMPHASIS "%p" MPTEST__COLOR_RESET ":\n",
+            (long unsigned int)current->block_size, (void*)current->header);
+        mptest__state_print_indent(state);
+        if (current->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_INITIAL) {
+          printf("      allocated with " MPTEST__COLOR_EMPHASIS
+                 "malloc()" MPTEST__COLOR_RESET "\n");
+        } else if (current->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_NEW) {
+          printf("      reallocated with " MPTEST__COLOR_EMPHASIS
+                 "realloc()" MPTEST__COLOR_RESET ":\n");
+          printf(
+              "        ...from " MPTEST__COLOR_EMPHASIS "%p" MPTEST__COLOR_RESET
+              "\n",
+              (void*)current->realloc_prev);
+        }
+        mptest__state_print_indent(state);
+        printf("      ...at ");
+        mptest__print_source_location(current->file, current->line);
+        printf("\n");
+      }
+      current = current->next;
+    }
+  }
+}
+
 #endif
 
 /* mptest */
@@ -4467,7 +4689,8 @@ MPTEST_INTERNAL void mptest__longjmp_exec(
     int line, const char* msg)
 {
   state->longjmp_state.reason = reason;
-  if (state->longjmp_state.checking == reason) {
+  if (state->longjmp_state.checking == reason &&
+      reason != MPTEST__FAIL_REASON_NONE) {
     MPTEST_LONGJMP(state->longjmp_state.assert_context, 1);
   } else {
     state->fail_file = file;
@@ -4582,13 +4805,7 @@ MPTEST_API void mptest__state_report(struct mptest__state* state)
         state->fails);
   }
 #if MPTEST_USE_TIME
-  {
-    clock_t program_end_time = clock();
-    double elapsed_time =
-        ((double)(program_end_time - state->time_state.program_start_time)) /
-        CLOCKS_PER_SEC;
-    printf(" in %f seconds", elapsed_time);
-  }
+  mptest__time_end(state);
 #endif
   printf("\n");
 }
@@ -4703,11 +4920,6 @@ MPTEST_INTERNAL mptest__result mptest__state_before_test(
     const char* test_name)
 {
   state->current_test = test_name;
-#if MPTEST_USE_LEAKCHECK
-  if (state->leakcheck_state.test_leak_checking) {
-    mptest__leakcheck_reset(state);
-  }
-#endif
   /* indent if we are running a suite */
   mptest__state_print_indent(state);
   printf(
@@ -4735,7 +4947,9 @@ MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
 {
   mptest__result res;
 #if MPTEST_USE_LEAKCHECK
-  mptest__leakcheck_reset(state);
+  if (mptest__leakcheck_before_test(state, test_func)) {
+    return MPTEST__RESULT_FAIL;
+  }
 #endif
 #if MPTEST_USE_LONGJMP
   if (MPTEST_SETJMP(state->longjmp_state.test_context) == 0) {
@@ -4747,7 +4961,7 @@ MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
   res = test_func();
 #endif
 #if MPTEST_USE_LEAKCHECK
-  if (mptest__leakcheck_has_leaks(state)) {
+  if (mptest__leakcheck_after_test(state)) {
     return MPTEST__RESULT_FAIL;
   }
 #endif
@@ -4758,18 +4972,6 @@ MPTEST_INTERNAL mptest__result mptest__state_do_run_test(
 MPTEST_INTERNAL void
 mptest__state_after_test(struct mptest__state* state, mptest__result res)
 {
-#if MPTEST_USE_LEAKCHECK
-  int has_leaks = 0;
-  if (state->leakcheck_state.test_leak_checking) {
-    has_leaks = mptest__leakcheck_has_leaks(state);
-    if (has_leaks) {
-      if (res == MPTEST__RESULT_PASS) {
-        res = MPTEST__RESULT_FAIL;
-        state->fail_reason = MPTEST__FAIL_REASON_LEAKED;
-      }
-    }
-  }
-#endif
   if (res == MPTEST__RESULT_PASS) {
     /* Test passed -> print pass message */
     state->passes++;
@@ -4830,44 +5032,6 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       mptest__sym_check_destroy();
     }
 #endif
-#if MPTEST_USE_LEAKCHECK
-    if (state->fail_reason == MPTEST__FAIL_REASON_LEAKED || has_leaks) {
-      struct mptest__leakcheck_block* current =
-          state->leakcheck_state.first_block;
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL
-             "memory leak(s) detected" MPTEST__COLOR_RESET ":\n");
-      while (current) {
-        if (mptest__leakcheck_block_has_freeable(current)) {
-          mptest__state_print_indent(state);
-          printf(
-              "    " MPTEST__COLOR_FAIL "leak" MPTEST__COLOR_RESET
-              " of " MPTEST__COLOR_EMPHASIS "%lu" MPTEST__COLOR_RESET
-              " bytes at " MPTEST__COLOR_EMPHASIS "%p" MPTEST__COLOR_RESET
-              ":\n",
-              (long unsigned int)current->block_size, (void*)current->header);
-          mptest__state_print_indent(state);
-          if (current->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_INITIAL) {
-            printf("      allocated with " MPTEST__COLOR_EMPHASIS
-                   "malloc()" MPTEST__COLOR_RESET "\n");
-          } else if (
-              current->flags & MPTEST__LEAKCHECK_BLOCK_FLAG_REALLOC_NEW) {
-            printf("      reallocated with " MPTEST__COLOR_EMPHASIS
-                   "realloc()" MPTEST__COLOR_RESET ":\n");
-            printf(
-                "        ...from " MPTEST__COLOR_EMPHASIS
-                "%p" MPTEST__COLOR_RESET "\n",
-                (void*)current->realloc_prev);
-          }
-          mptest__state_print_indent(state);
-          printf("      ...at ");
-          mptest__print_source_location(current->file, current->line);
-          printf("\n");
-        }
-        current = current->next;
-      }
-    }
-#endif
   } else if (res == MPTEST__RESULT_ERROR) {
     state->errors++;
     state->total++;
@@ -4920,116 +5084,17 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
       printf("    ...at ");
       mptest__print_source_location(state->fail_file, state->fail_line);
     }
-#if MPTEST_USE_LEAKCHECK
-    if (state->fail_reason == MPTEST__FAIL_REASON_NOMEM) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL "internal error: malloc() returned "
-             "a null pointer" MPTEST__COLOR_RESET "\n");
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_NULL) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL "attempt to call realloc() on a NULL "
-             "pointer" MPTEST__COLOR_RESET "\n");
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_NULL) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL "attempt to call free() on a NULL "
-             "pointer" MPTEST__COLOR_RESET "\n");
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_INVALID) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL "attempt to call realloc() on an "
-             "invalid pointer (pointer was not "
-             "returned by malloc() or realloc())" MPTEST__COLOR_RESET ":\n");
-      mptest__state_print_indent(state);
-      printf("    pointer: %p\n", state->fail_data.memory_block);
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_FREED) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL
-             "attempt to call realloc() on a pointer that was already "
-             "freed" MPTEST__COLOR_RESET ":\n");
-      mptest__state_print_indent(state);
-      printf("    pointer: %p\n", state->fail_data.memory_block);
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_REALLOC_OF_REALLOCED) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL
-             "attempt to call realloc() on a pointer that was already "
-             "reallocated" MPTEST__COLOR_RESET ":\n");
-      mptest__state_print_indent(state);
-      printf("    pointer: %p\n", state->fail_data.memory_block);
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_INVALID) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL "attempt to call free() on an "
-             "invalid pointer (pointer was not "
-             "returned by malloc() or free())" MPTEST__COLOR_RESET ":\n");
-      mptest__state_print_indent(state);
-      printf("    pointer: %p\n", state->fail_data.memory_block);
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL
-             "attempt to call free() on a pointer that was already "
-             "freed" MPTEST__COLOR_RESET ":\n");
-      mptest__state_print_indent(state);
-      printf("    pointer: %p\n", state->fail_data.memory_block);
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-    if (state->fail_reason == MPTEST__FAIL_REASON_FREE_OF_FREED) {
-      mptest__state_print_indent(state);
-      printf("  " MPTEST__COLOR_FAIL
-             "attempt to call free() on a pointer that was already "
-             "freed" MPTEST__COLOR_RESET ":\n");
-      mptest__state_print_indent(state);
-      printf("    pointer: %p\n", state->fail_data.memory_block);
-      mptest__state_print_indent(state);
-      printf("    ...at ");
-      mptest__print_source_location(state->fail_file, state->fail_line);
-      printf("\n");
-    }
-#endif
 #endif
   } else if (res == MPTEST__RESULT_SKIPPED) {
     printf("skipped\n");
   }
-  if (res == MPTEST__RESULT_FAIL || res == MPTEST__RESULT_ERROR) {
-#if MPTEST_USE_FUZZ
-    /* Print fuzz information, if any */
-    mptest__fuzz_print(state);
+#if MPTEST_USE_LEAKCHECK
+  mptest__leakcheck_report_test(state, res);
 #endif
+#if MPTEST_USE_FUZZ
+  mptest__fuzz_report_test(state, res);
+#endif
+  if (res == MPTEST__RESULT_FAIL || res == MPTEST__RESULT_ERROR) {
     if (state->fault_fail_call_idx != -1) {
       printf(
           "    ...at fault iteration " MPTEST__COLOR_EMPHASIS
@@ -5037,10 +5102,6 @@ mptest__state_after_test(struct mptest__state* state, mptest__result res)
           state->fault_fail_call_idx);
     }
   }
-#if MPTEST_USE_LEAKCHECK
-  /* Reset leak-checking state (IMPORTANT!) */
-  mptest__leakcheck_reset(state);
-#endif
 }
 
 MPTEST_API void mptest__run_test(
@@ -6207,6 +6268,15 @@ MPTEST_INTERNAL void mptest__time_init(struct mptest__state* state)
 MPTEST_INTERNAL void mptest__time_destroy(struct mptest__state* state)
 {
   (void)(state);
+}
+
+MPTEST_INTERNAL void mptest__time_end(struct mptest__state* state)
+{
+  clock_t program_end_time = clock();
+  double elapsed_time =
+      ((double)(program_end_time - state->time_state.program_start_time)) /
+      CLOCKS_PER_SEC;
+  printf(" in %f seconds", elapsed_time);
 }
 
 #endif
